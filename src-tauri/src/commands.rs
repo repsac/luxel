@@ -5,6 +5,7 @@ use luxel_io::{load_scene_file, save_scene_file};
 use luxel_render::{compile_glsl_fragment, FrameInputs, GpuBackend, ShaderCompileResult};
 use luxel_system::{GpuInfo, SystemStatus};
 use serde::Serialize;
+use tauri::ipc::Response;
 use tauri::State;
 use thiserror::Error;
 
@@ -96,6 +97,18 @@ pub fn compile_shader(shader: ShaderSource) -> Result<ShaderCompileResult, AppEr
     }
 }
 
+/// Size (in bytes) of the metadata header prepended to the pixel payload.
+/// Layout (little-endian):
+///   bytes  0..4   : width  (u32)
+///   bytes  4..8   : height (u32)
+///   bytes  8..12  : total_ms (u32)
+///   bytes 12..16  : gpu_ms (u32)
+///   bytes 16..    : RGBA8 pixels, row-major, top-to-bottom
+///
+/// Keeping the header tiny and self-describing avoids a second IPC roundtrip
+/// for metadata and is much faster to construct than a JSON object.
+pub const RENDER_HEADER_BYTES: usize = 16;
+
 #[tauri::command]
 pub fn render_single_frame(
     scene: SceneFile,
@@ -104,8 +117,7 @@ pub fn render_single_frame(
     #[allow(non_snake_case)] widthOverride: Option<u32>,
     #[allow(non_snake_case)] heightOverride: Option<u32>,
     state: State<'_, AppState>,
-) -> Result<luxel_render::RenderResult, AppError> {
-    validate_scene(&scene).map_err(|e| AppError::Validation(e.to_string()))?;
+) -> Result<Response, AppError> {
     // Apply size overrides on a local copy so we can re-validate dimensions.
     let mut effective = scene.scene.clone();
     if let Some(w) = widthOverride {
@@ -114,13 +126,18 @@ pub fn render_single_frame(
     if let Some(h) = heightOverride {
         effective.render_settings.height = h.clamp(16, 4096);
     }
+    let effective_file = SceneFile {
+        scene: effective,
+        ..scene
+    };
+    validate_scene(&effective_file).map_err(|e| AppError::Validation(e.to_string()))?;
     let renderer = state.renderer().map_err(AppError::Render)?;
     let inputs = FrameInputs {
         time: timeOverride.unwrap_or(0.0),
         frame: frameOverride.unwrap_or(0),
         mouse: [0.0; 4],
     };
-    match renderer.render_single_frame_with(&effective, inputs) {
+    match renderer.render_single_frame_with(&effective_file.scene, inputs) {
         Ok(r) => {
             emit_console(
                 LogLevel::Info,
@@ -131,7 +148,18 @@ pub fn render_single_frame(
                 ),
                 None,
             );
-            Ok(r)
+            // Pack the metadata header in front of the pixel buffer in a
+            // single allocation. The whole thing flows over the Tauri IPC
+            // boundary as raw bytes (no JSON/base64), and the frontend reads
+            // a 16-byte header off the front before handing the rest straight
+            // to ImageData.
+            let mut payload = Vec::with_capacity(RENDER_HEADER_BYTES + r.pixels.len());
+            payload.extend_from_slice(&r.width.to_le_bytes());
+            payload.extend_from_slice(&r.height.to_le_bytes());
+            payload.extend_from_slice(&r.timing.total_ms.to_le_bytes());
+            payload.extend_from_slice(&r.timing.gpu_ms.to_le_bytes());
+            payload.extend_from_slice(&r.pixels);
+            Ok(Response::new(payload))
         }
         Err(e) => {
             if let luxel_render::RenderError::ShaderCompile(sc) = &e {

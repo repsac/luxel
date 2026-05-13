@@ -7,8 +7,11 @@ export interface LastRender {
   totalMs: number;
   width: number;
   height: number;
-  /// RGBA8 pixels as a base64 string (no data: prefix).
-  pixelsBase64: string;
+  /// RGBA8 pixels, row-major top-to-bottom. Stored as a typed array so the
+  /// render view can hand it straight to `ImageData` without `atob` or a copy.
+  /// Length always equals `width * height * 4`. Pinned to a concrete
+  /// `ArrayBuffer` so it satisfies the `ImageData` constructor's type bound.
+  pixels: Uint8ClampedArray<ArrayBuffer>;
 }
 
 export interface ShaderDiagnostic {

@@ -69,11 +69,14 @@ export default function RenderView() {
     if (lastRender) {
       canvas.width = lastRender.width;
       canvas.height = lastRender.height;
-      const bytes = Uint8ClampedArray.from(atob(lastRender.pixelsBase64), (c) =>
-        c.charCodeAt(0),
-      );
-      if (bytes.length === lastRender.width * lastRender.height * 4) {
-        ctx.putImageData(new ImageData(bytes, lastRender.width, lastRender.height), 0, 0);
+      // `lastRender.pixels` is a Uint8ClampedArray view onto the ArrayBuffer
+      // we got over the Tauri IPC boundary — no atob, no copy.
+      if (lastRender.pixels.length === lastRender.width * lastRender.height * 4) {
+        ctx.putImageData(
+          new ImageData(lastRender.pixels, lastRender.width, lastRender.height),
+          0,
+          0,
+        );
       }
     } else {
       canvas.width = Math.max(16, wrapPx.w);

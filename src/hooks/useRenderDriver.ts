@@ -33,6 +33,7 @@ export function useRenderDriver(): void {
 
   const dirtyRef = useRef(true);
   const renderingRef = useRef(false);
+  const renderSerialRef = useRef(0);
 
   // Anything that affects pixels marks the scene dirty for the next frame.
   useEffect(() => {
@@ -60,6 +61,7 @@ export function useRenderDriver(): void {
         if (current && a.previewWidth > 0 && a.previewHeight > 0) {
           dirtyRef.current = false;
           renderingRef.current = true;
+          const renderSerial = ++renderSerialRef.current;
           const w = Math.max(16, Math.round(a.previewWidth * a.renderQuality));
           const h = Math.max(16, Math.round(a.previewHeight * a.renderQuality));
           renderScene({
@@ -68,6 +70,7 @@ export function useRenderDriver(): void {
             frame: a.iFrame,
             width: w,
             height: h,
+            isCurrent: () => renderSerial === renderSerialRef.current && !dirtyRef.current,
           }).finally(() => {
             renderingRef.current = false;
           });

@@ -24,17 +24,16 @@ fn default_scene_produces_pixels() {
     let scene = Scene::default();
     let result = r.render_single_frame(&scene).expect("render should succeed");
     let expected = (scene.render_settings.width * scene.render_settings.height * 4) as usize;
-    assert_eq!(result.pixel_bytes, expected, "pixel byte count");
+    assert_eq!(result.pixel_bytes(), expected, "pixel byte count");
     assert_eq!(result.width, scene.render_settings.width);
     assert_eq!(result.height, scene.render_settings.height);
     // The default gradient varies across the frame — top-left and bottom-right
     // pixels must differ on at least one channel.
-    let pixels = base64_decode(&result.pixels_base64);
-    let bpr = (scene.render_settings.width * 4) as usize;
+    let pixels = &result.pixels;
     let tl = &pixels[..4];
     let br_offset = pixels.len() - 4;
     let br = &pixels[br_offset..];
-    assert_ne!(tl, br, "gradient should not be uniform; bpr={bpr}");
+    assert_ne!(tl, br, "gradient should not be uniform");
 }
 
 #[test]
@@ -45,7 +44,7 @@ fn raymarch_scene_renders() {
     scene.render_settings.width = 256;
     scene.render_settings.height = 256;
     let result = r.render_single_frame(&scene).expect("raymarch should render");
-    let pixels = base64_decode(&result.pixels_base64);
+    let pixels = &result.pixels;
     // The sphere is centered; the middle pixel must be lighter than the corner.
     let stride = 256 * 4;
     let center = &pixels[128 * stride + 128 * 4..128 * stride + 128 * 4 + 3];
@@ -79,43 +78,5 @@ fn scene_file_to_render_round_trip() {
     let json = serde_json::to_string(&file).unwrap();
     let parsed: SceneFile = serde_json::from_str(&json).unwrap();
     let result = r.render_single_frame(&parsed.scene).expect("render should succeed");
-    assert!(result.pixel_bytes > 0);
-}
-
-fn base64_decode(s: &str) -> Vec<u8> {
-    const T: [i8; 128] = build_decode_table();
-    let s = s.as_bytes();
-    let mut out = Vec::with_capacity(s.len() / 4 * 3);
-    let mut buf: u32 = 0;
-    let mut bits: u32 = 0;
-    for &c in s {
-        if c == b'=' {
-            break;
-        }
-        if c < 128 {
-            let v = T[c as usize];
-            if v < 0 {
-                continue;
-            }
-            buf = (buf << 6) | v as u32;
-            bits += 6;
-            if bits >= 8 {
-                bits -= 8;
-                out.push((buf >> bits) as u8);
-                buf &= (1 << bits) - 1;
-            }
-        }
-    }
-    out
-}
-
-const fn build_decode_table() -> [i8; 128] {
-    let mut t = [-1i8; 128];
-    let alpha = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-    let mut i = 0;
-    while i < 64 {
-        t[alpha[i] as usize] = i as i8;
-        i += 1;
-    }
-    t
+    assert!(result.pixel_bytes() > 0);
 }
