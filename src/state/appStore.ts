@@ -34,6 +34,9 @@ interface AppStore {
   renderQuality: number;
   /// Whether to render the FPS overlay on top of the render view.
   showFps: boolean;
+  /// Font size used in the GLSL editor, in CSS pixels. Persisted via
+  /// localStorage so it survives restarts.
+  editorFontSize: number;
   /// performance.now() timestamps of recent completed renders. Used to derive
   /// a rolling FPS without storing per-frame state in the scene file.
   renderTimestamps: number[];
@@ -48,10 +51,42 @@ interface AppStore {
   setRenderQuality: (q: number) => void;
   setShowFps: (show: boolean) => void;
   toggleFps: () => void;
+  setEditorFontSize: (size: number) => void;
+  increaseEditorFontSize: () => void;
+  decreaseEditorFontSize: () => void;
+  resetEditorFontSize: () => void;
   recordRenderCompleted: (now?: number) => void;
 }
 
 const SHOW_FPS_KEY = "luxel.showFps";
+const EDITOR_FONT_KEY = "luxel.editorFontSize";
+export const EDITOR_FONT_DEFAULT = 13;
+export const EDITOR_FONT_MIN = 8;
+export const EDITOR_FONT_MAX = 32;
+
+function readStoredNumber(key: string, fallback: number): number {
+  try {
+    const v = localStorage.getItem(key);
+    if (v === null) return fallback;
+    const n = parseInt(v, 10);
+    return Number.isFinite(n) ? n : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function writeStoredNumber(key: string, value: number): void {
+  try {
+    localStorage.setItem(key, String(value));
+  } catch {
+    // Private/locked storage — silently ignore.
+  }
+}
+
+function clampFont(size: number): number {
+  if (!Number.isFinite(size)) return EDITOR_FONT_DEFAULT;
+  return Math.max(EDITOR_FONT_MIN, Math.min(EDITOR_FONT_MAX, Math.round(size)));
+}
 
 /// Local-storage-backed read; never throws on private-mode failures.
 function readStoredFlag(key: string, fallback: boolean): boolean {
@@ -110,6 +145,7 @@ export const useAppStore = create<AppStore>((set) => ({
   previewHeight: 0,
   renderQuality: 1.0,
   showFps: readStoredFlag(SHOW_FPS_KEY, false),
+  editorFontSize: clampFont(readStoredNumber(EDITOR_FONT_KEY, EDITOR_FONT_DEFAULT)),
   renderTimestamps: [],
   setShaderStatus: (s) => set({ shaderStatus: s }),
   setLastRender: (r) => set({ lastRender: r }),
@@ -129,6 +165,29 @@ export const useAppStore = create<AppStore>((set) => ({
       const next = !s.showFps;
       writeStoredFlag(SHOW_FPS_KEY, next);
       return { showFps: next };
+    }),
+  setEditorFontSize: (size) =>
+    set(() => {
+      const next = clampFont(size);
+      writeStoredNumber(EDITOR_FONT_KEY, next);
+      return { editorFontSize: next };
+    }),
+  increaseEditorFontSize: () =>
+    set((s) => {
+      const next = clampFont(s.editorFontSize + 1);
+      writeStoredNumber(EDITOR_FONT_KEY, next);
+      return { editorFontSize: next };
+    }),
+  decreaseEditorFontSize: () =>
+    set((s) => {
+      const next = clampFont(s.editorFontSize - 1);
+      writeStoredNumber(EDITOR_FONT_KEY, next);
+      return { editorFontSize: next };
+    }),
+  resetEditorFontSize: () =>
+    set(() => {
+      writeStoredNumber(EDITOR_FONT_KEY, EDITOR_FONT_DEFAULT);
+      return { editorFontSize: EDITOR_FONT_DEFAULT };
     }),
   recordRenderCompleted: (now) =>
     set((s) => {

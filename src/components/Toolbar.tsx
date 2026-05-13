@@ -75,6 +75,22 @@ export default function Toolbar() {
         e.preventDefault();
         void save();
       }
+      // Editor zoom — match standard OS conventions. Cmd/Ctrl+= and Cmd/Ctrl++
+      // both mean "zoom in" (the former is what you actually type on US
+      // keyboards; the latter is the labeled glyph). We preventDefault so the
+      // webview doesn't zoom the whole UI on top of the editor zoom.
+      if (e.metaKey || e.ctrlKey) {
+        if (e.key === "=" || e.key === "+") {
+          e.preventDefault();
+          useAppStore.getState().increaseEditorFontSize();
+        } else if (e.key === "-" || e.key === "_") {
+          e.preventDefault();
+          useAppStore.getState().decreaseEditorFontSize();
+        } else if (e.key === "0") {
+          e.preventDefault();
+          useAppStore.getState().resetEditorFontSize();
+        }
+      }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);

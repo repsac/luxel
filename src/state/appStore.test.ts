@@ -1,5 +1,55 @@
-import { describe, it, expect } from "vitest";
-import { computeFps } from "./appStore";
+import { beforeEach, describe, it, expect } from "vitest";
+import {
+  computeFps,
+  EDITOR_FONT_DEFAULT,
+  EDITOR_FONT_MAX,
+  EDITOR_FONT_MIN,
+  useAppStore,
+} from "./appStore";
+
+describe("editor font-size actions", () => {
+  beforeEach(() => {
+    useAppStore.getState().resetEditorFontSize();
+  });
+
+  it("starts at the default size", () => {
+    expect(useAppStore.getState().editorFontSize).toBe(EDITOR_FONT_DEFAULT);
+  });
+
+  it("increase steps up by 1 and caps at EDITOR_FONT_MAX", () => {
+    const start = useAppStore.getState().editorFontSize;
+    useAppStore.getState().increaseEditorFontSize();
+    expect(useAppStore.getState().editorFontSize).toBe(start + 1);
+    for (let i = 0; i < 100; i++) useAppStore.getState().increaseEditorFontSize();
+    expect(useAppStore.getState().editorFontSize).toBe(EDITOR_FONT_MAX);
+  });
+
+  it("decrease steps down by 1 and floors at EDITOR_FONT_MIN", () => {
+    for (let i = 0; i < 100; i++) useAppStore.getState().decreaseEditorFontSize();
+    expect(useAppStore.getState().editorFontSize).toBe(EDITOR_FONT_MIN);
+  });
+
+  it("reset returns to the default after zooming", () => {
+    useAppStore.getState().increaseEditorFontSize();
+    useAppStore.getState().increaseEditorFontSize();
+    useAppStore.getState().resetEditorFontSize();
+    expect(useAppStore.getState().editorFontSize).toBe(EDITOR_FONT_DEFAULT);
+  });
+
+  it("setEditorFontSize clamps non-finite input to the default", () => {
+    useAppStore.getState().setEditorFontSize(Number.NaN);
+    expect(useAppStore.getState().editorFontSize).toBe(EDITOR_FONT_DEFAULT);
+  });
+
+  it("setEditorFontSize rounds fractional input and clamps to the legal range", () => {
+    useAppStore.getState().setEditorFontSize(15.4);
+    expect(useAppStore.getState().editorFontSize).toBe(15);
+    useAppStore.getState().setEditorFontSize(EDITOR_FONT_MAX + 50);
+    expect(useAppStore.getState().editorFontSize).toBe(EDITOR_FONT_MAX);
+    useAppStore.getState().setEditorFontSize(EDITOR_FONT_MIN - 50);
+    expect(useAppStore.getState().editorFontSize).toBe(EDITOR_FONT_MIN);
+  });
+});
 
 describe("computeFps", () => {
   it("returns 0 when there is no history", () => {

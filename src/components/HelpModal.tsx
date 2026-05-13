@@ -88,6 +88,12 @@ export default function HelpModal({ open, onClose }: Props) {
                     feel jerky.
                   </td>
                 </tr>
+                <tr>
+                  <td>
+                    <kbd>Cmd/Ctrl</kbd>+<kbd>=</kbd> / <kbd>−</kbd> / <kbd>0</kbd>
+                  </td>
+                  <td>Editor zoom in / out / reset (magnifier buttons in the editor header)</td>
+                </tr>
               </tbody>
             </table>
             <p className="hint">
