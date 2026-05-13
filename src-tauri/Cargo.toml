@@ -1,0 +1,36 @@
+[package]
+name = "luxel-app"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+description = "Luxel desktop GLSL renderer (Tauri shell)"
+
+[lib]
+name = "luxel_app"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+luxel-core = { path = "../crates/luxel-core" }
+luxel-io = { path = "../crates/luxel-io" }
+luxel-render = { path = "../crates/luxel-render" }
+luxel-system = { path = "../crates/luxel-system" }
+tauri = { version = "2", features = [] }
+tauri-plugin-dialog = "2"
+tauri-plugin-fs = "2"
+tauri-plugin-shell = "2"
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+chrono = { workspace = true }
+anyhow = { workspace = true }
+parking_lot = "0.12"
+
+[features]
+default = ["custom-protocol"]
+custom-protocol = ["tauri/custom-protocol"]

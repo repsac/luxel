@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 2,
+  "appVersion": "0.1.0",
+  "scene": {
+    "name": "Untitled Shader Scene",
+    "shader": {
+      "language": "glsl",
+      "source": "void mainImage(out vec4 fragColor, in vec2 fragCoord)\n{\n    vec2 uv = fragCoord / iResolution.xy;\n    vec3 color = vec3(uv.x, uv.y, 0.35 + 0.25 * sin(iTime));\n    fragColor = vec4(color, 1.0);\n}\n",
+      "entryPoint": "mainImage",
+      "compatibility": "shadertoy-fragment-v1"
+    },
+    "renderSettings": {
+      "mode": "single_frame",
+      "width": 1280,
+      "height": 720,
+      "aspectRatio": "16:9",
+      "showFrustumOverlay": true
+    },
+    "camera": {
+      "position": [0.0, 0.0, 5.0],
+      "target": [0.0, 0.0, 0.0],
+      "up": [0.0, 1.0, 0.0],
+      "fovYDegrees": 45.0,
+      "near": 0.1,
+      "far": 1000.0
+    },
+    "cameraBookmarks": [
+      {
+        "id": "default",
+        "name": "Default",
+        "position": [0.0, 0.0, 5.0],
+        "target": [0.0, 0.0, 0.0],
+        "up": [0.0, 1.0, 0.0],
+        "fovYDegrees": 45.0
+      }
+    ],
+    "layout": {
+      "slots": {
+        "topLeft": { "view": "render", "visible": true },
+        "topRight": { "view": "editor", "visible": true },
+        "bottom": { "view": "console", "visible": true }
+      },
+      "sizes": { "bottomFraction": 0.25, "topLeftFraction": 0.55 },
+      "maximized": null
+    }
+  }
+}

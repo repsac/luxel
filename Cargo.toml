@@ -1,0 +1,46 @@
+[workspace]
+resolver = "2"
+members = [
+    "src-tauri",
+    "crates/luxel-core",
+    "crates/luxel-render",
+    "crates/luxel-system",
+    "crates/luxel-io",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+authors = ["Luxel Contributors"]
+repository = "https://github.com/edcaspersen/luxel"
+
+[workspace.dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "1"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+wgpu = "22"
+naga = { version = "22", features = ["glsl-in", "wgsl-out"] }
+bytemuck = { version = "1", features = ["derive"] }
+glam = { version = "0.29", features = ["serde"] }
+sysinfo = "0.32"
+anyhow = "1"
+chrono = { version = "0.4", default-features = false, features = ["clock", "serde"] }
+pollster = "0.4"
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+
+# Dev builds keep our own crates fast to recompile but compile dependencies
+# at full optimization. This is the standard Rust-gamedev pattern: it costs a
+# few extra seconds the first time you build but makes wgpu, naga, glam, and
+# wgpu-hal run roughly an order of magnitude faster, which is the difference
+# between a snappy preview and a jerky one during camera navigation.
+[profile.dev]
+opt-level = 1
+
+[profile.dev.package."*"]
+opt-level = 3

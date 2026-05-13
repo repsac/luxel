@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 2,
+  "appVersion": "0.1.0",
+  "scene": {
+    "name": "Test Scene",
+    "shader": {
+      "language": "glsl",
+      "source": "void mainImage(out vec4 c, in vec2 p){ c = vec4(0.0, 0.2, 0.4, 1.0); }",
+      "entryPoint": "mainImage",
+      "compatibility": "shadertoy-fragment-v1"
+    },
+    "renderSettings": {
+      "mode": "single_frame",
+      "width": 640,
+      "height": 360,
+      "aspectRatio": "16:9",
+      "showFrustumOverlay": false
+    },
+    "camera": {
+      "position": [0.0, 0.0, 5.0],
+      "target": [0.0, 0.0, 0.0],
+      "up": [0.0, 1.0, 0.0],
+      "fovYDegrees": 60.0,
+      "near": 0.1,
+      "far": 100.0
+    },
+    "cameraBookmarks": [
+      {
+        "id": "default",
+        "name": "Default",
+        "position": [0.0, 0.0, 5.0],
+        "target": [0.0, 0.0, 0.0],
+        "up": [0.0, 1.0, 0.0],
+        "fovYDegrees": 60.0
+      }
+    ],
+    "layout": {
+      "slots": {
+        "topLeft": { "view": "render", "visible": true },
+        "topRight": { "view": "editor", "visible": true },
+        "bottom": { "view": "console", "visible": true }
+      },
+      "sizes": { "bottomFraction": 0.25, "topLeftFraction": 0.55 },
+      "maximized": null
+    }
+  }
+}

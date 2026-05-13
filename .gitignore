@@ -1,0 +1,26 @@
+# Rust
+target/
+**/*.rs.bk
+
+# Tauri
+src-tauri/target/
+src-tauri/gen/
+
+# Node
+node_modules/
+dist/
+.vite/
+
+# Editors
+.vscode/
+.idea/
+.DS_Store
+
+# Python
+**/__pycache__/
+*.pyc
+
+# Local env
+.env
+.env.local
+*.log
