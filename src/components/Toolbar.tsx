@@ -14,6 +14,56 @@ import {
   FULL_BUILD_LABEL,
 } from "../build-info";
 
+/// Returns true when the event originated from a text-entry surface (form
+/// input, textarea, contenteditable, or CodeMirror's content area). Plain-key
+/// playback hotkeys skip those contexts so the user can still type a space,
+/// move a cursor with arrow keys, etc.
+function isTypingInForm(el: HTMLElement | null): boolean {
+  if (!el) return false;
+  const tag = el.tagName;
+  if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return true;
+  if (el.isContentEditable) return true;
+  if (el.closest(".cm-content")) return true;
+  return false;
+}
+
+/// Imperative dispatcher for playback actions. Used by both the toolbar key
+/// handler below and PlaybackBar — keeps the logic in one place so the
+/// hotkeys and the on-screen buttons stay in lockstep.
+function playbackAction(
+  action: "first" | "last" | "stepBack" | "stepForward" | "playFwd" | "playBwd",
+): void {
+  const file = useSceneStore.getState().file;
+  if (!file) return;
+  const t = file.scene.timeline;
+  const scene = useSceneStore.getState();
+  const app = useAppStore.getState();
+  switch (action) {
+    case "first":
+      app.pause();
+      scene.setCurrentFrame(t.firstFrame);
+      break;
+    case "last":
+      app.pause();
+      scene.setCurrentFrame(t.lastFrame);
+      break;
+    case "stepBack":
+      app.pause();
+      scene.setCurrentFrame(t.currentFrame - 1);
+      break;
+    case "stepForward":
+      app.pause();
+      scene.setCurrentFrame(t.currentFrame + 1);
+      break;
+    case "playFwd":
+      app.togglePlay(1);
+      break;
+    case "playBwd":
+      app.togglePlay(-1);
+      break;
+  }
+}
+
 export default function Toolbar() {
   const file = useSceneStore((s) => s.file);
   const dirty = useSceneStore((s) => s.dirty);
@@ -22,10 +72,6 @@ export default function Toolbar() {
   const markSaved = useSceneStore((s) => s.markSaved);
   const updateShaderSource = useSceneStore((s) => s.updateShaderSource);
 
-  const iTime = useAppStore((s) => s.iTime);
-  const setITime = useAppStore((s) => s.setITime);
-  const iFrame = useAppStore((s) => s.iFrame);
-  const setIFrame = useAppStore((s) => s.setIFrame);
   const renderQuality = useAppStore((s) => s.renderQuality);
   const setRenderQuality = useAppStore((s) => s.setRenderQuality);
   const showFps = useAppStore((s) => s.showFps);
@@ -36,7 +82,6 @@ export default function Toolbar() {
   const [examplesOpen, setExamplesOpen] = useState(false);
   const examplesRef = useRef<HTMLDivElement | null>(null);
 
-  // Close the examples dropdown on outside click.
   useEffect(() => {
     if (!examplesOpen) return;
     const onClick = (e: MouseEvent) => {
@@ -48,9 +93,23 @@ export default function Toolbar() {
     return () => document.removeEventListener("mousedown", onClick);
   }, [examplesOpen]);
 
-  // Cmd/Ctrl+Enter to render anywhere in the app.
+  // Global keyboard shortcuts.
+  //
+  // Cmd/Ctrl modifier shortcuts (render, save, editor zoom) always fire, even
+  // while the editor or an input is focused — they're system actions.
+  //
+  // Cmd/Ctrl+Arrow are timeline jumps that we only steal *outside* text
+  // contexts, so the OS-native "beginning/end of line" or "word jump"
+  // behavior still works while you're typing.
+  //
+  // Plain-key playback shortcuts (Home/End, Arrow Left/Right, Space) skip
+  // any text-entry surface so they don't hijack cursor movement or break
+  // typing a literal space character.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      const typing = isTypingInForm(e.target as HTMLElement);
+
+      // ---- Cmd/Ctrl modifier shortcuts (always fire) ----
       if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
         e.preventDefault();
         const f = useSceneStore.getState().file;
@@ -62,34 +121,85 @@ export default function Toolbar() {
           const h = a.previewHeight
             ? Math.max(16, Math.round(a.previewHeight * a.renderQuality))
             : undefined;
+          const t = f.scene.timeline;
           void renderScene({
             scene: f,
-            time: a.iTime,
-            frame: a.iFrame,
+            time: t.targetFps > 0 ? t.currentFrame / t.targetFps : 0,
+            frame: t.currentFrame,
             width: w,
             height: h,
           });
         }
+        return;
       }
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "s") {
         e.preventDefault();
         void save();
+        return;
       }
-      // Editor zoom — match standard OS conventions. Cmd/Ctrl+= and Cmd/Ctrl++
-      // both mean "zoom in" (the former is what you actually type on US
-      // keyboards; the latter is the labeled glyph). We preventDefault so the
-      // webview doesn't zoom the whole UI on top of the editor zoom.
       if (e.metaKey || e.ctrlKey) {
         if (e.key === "=" || e.key === "+") {
           e.preventDefault();
           useAppStore.getState().increaseEditorFontSize();
-        } else if (e.key === "-" || e.key === "_") {
+          return;
+        }
+        if (e.key === "-" || e.key === "_") {
           e.preventDefault();
           useAppStore.getState().decreaseEditorFontSize();
-        } else if (e.key === "0") {
+          return;
+        }
+        if (e.key === "0") {
           e.preventDefault();
           useAppStore.getState().resetEditorFontSize();
+          return;
         }
+        // Cmd/Ctrl + Left/Right = jump to first/last frame, but only when
+        // we're not inside a text field — there those mean "jump to line
+        // start/end" (Mac) or "previous/next word" (Windows convention).
+        if (!typing && e.key === "ArrowLeft") {
+          e.preventDefault();
+          playbackAction("first");
+          return;
+        }
+        if (!typing && e.key === "ArrowRight") {
+          e.preventDefault();
+          playbackAction("last");
+          return;
+        }
+        return;
+      }
+
+      // ---- Plain-key playback shortcuts (skipped while typing) ----
+      if (typing) return;
+
+      if (e.key === "Home") {
+        e.preventDefault();
+        playbackAction("first");
+        return;
+      }
+      if (e.key === "End") {
+        e.preventDefault();
+        playbackAction("last");
+        return;
+      }
+      if (e.key === "ArrowLeft" && !e.altKey && !e.shiftKey) {
+        e.preventDefault();
+        playbackAction("stepBack");
+        return;
+      }
+      if (e.key === "ArrowRight" && !e.altKey && !e.shiftKey) {
+        e.preventDefault();
+        playbackAction("stepForward");
+        return;
+      }
+      if (e.key === " ") {
+        // Shift+Space plays backward; plain Space plays forward.
+        // preventDefault stops the default "activate focused button" behavior
+        // so we don't get a double-toggle if a transport button was just
+        // clicked and still has focus.
+        e.preventDefault();
+        playbackAction(e.shiftKey ? "playBwd" : "playFwd");
+        return;
       }
     };
     window.addEventListener("keydown", onKey);
@@ -137,7 +247,14 @@ export default function Toolbar() {
     const h = a.previewHeight
       ? Math.max(16, Math.round(a.previewHeight * a.renderQuality))
       : undefined;
-    await renderScene({ scene: file, time: iTime, frame: iFrame, width: w, height: h });
+    const t = file.scene.timeline;
+    await renderScene({
+      scene: file,
+      time: t.targetFps > 0 ? t.currentFrame / t.targetFps : 0,
+      frame: t.currentFrame,
+      width: w,
+      height: h,
+    });
   }
 
   async function save() {
@@ -280,28 +397,6 @@ export default function Toolbar() {
         Export PNG
       </button>
 
-      <span className="time-control" title="iTime uniform sent to the shader — manual scrub">
-        <label>iTime</label>
-        <input
-          type="range"
-          min={0}
-          max={60}
-          step={0.01}
-          value={iTime}
-          onChange={(e) => setITime(parseFloat(e.target.value))}
-        />
-        <span className="value">{iTime.toFixed(2)}</span>
-      </span>
-      <span className="time-control" title="iFrame uniform sent to the shader">
-        <label>iFrame</label>
-        <input
-          type="number"
-          min={0}
-          max={100000}
-          value={iFrame}
-          onChange={(e) => setIFrame(parseInt(e.target.value || "0", 10))}
-        />
-      </span>
       <button
         onClick={toggleFps}
         className={showFps ? "primary" : ""}

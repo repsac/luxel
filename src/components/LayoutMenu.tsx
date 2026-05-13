@@ -1,22 +1,18 @@
 import { useEffect, useRef, useState } from "react";
-import { LAYOUT_PRESETS, VIEW_LABELS } from "../state/layoutStore";
-import type { SlotId } from "../state/sceneStore";
+import {
+  LAYOUT_PRESETS,
+  reshapeSlots,
+  useCustomLayouts,
+} from "../state/layoutStore";
+import type { LayoutState } from "../state/sceneStore";
 import { useSceneStore } from "../state/sceneStore";
-
-const SLOT_ORDER: SlotId[] = ["topLeft", "topRight", "bottom"];
-
-const SLOT_LABELS: Record<SlotId, string> = {
-  topLeft: "Top-left",
-  topRight: "Top-right",
-  bottom: "Bottom",
-};
 
 export default function LayoutMenu() {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement | null>(null);
   const file = useSceneStore((s) => s.file);
   const setLayout = useSceneStore((s) => s.setLayout);
-  const setSlotVisible = useSceneStore((s) => s.setSlotVisible);
+  const customs = useCustomLayouts();
 
   useEffect(() => {
     if (!open) return;
@@ -28,11 +24,31 @@ export default function LayoutMenu() {
   }, [open]);
 
   if (!file) return null;
-  const slots = file.scene.layout.slots;
+
+  function apply(layout: LayoutState) {
+    // Defensive: callers should already produce a slot list that matches the
+    // shape, but reshapeSlots keeps us safe if a saved custom is out of sync.
+    const fixed: LayoutState = {
+      ...layout,
+      slots: reshapeSlots(layout.slots, layout.shape),
+    };
+    setLayout(fixed);
+    setOpen(false);
+  }
+
+  function saveAsCustom() {
+    if (!file) return;
+    const name = window.prompt(
+      "Save current layout as…",
+      `Layout ${customs.list.length + 1}`,
+    );
+    if (!name) return;
+    customs.save(name.trim(), file.scene.layout);
+  }
 
   return (
     <div className="dropdown" ref={ref}>
-      <button onClick={() => setOpen((v) => !v)} title="Layout presets and slot visibility">
+      <button onClick={() => setOpen((v) => !v)} title="Layout presets and view slots">
         Layout ▾
       </button>
       {open && (
@@ -42,27 +58,38 @@ export default function LayoutMenu() {
             <button
               key={p.id}
               className="dropdown-item"
-              onClick={() => {
-                setLayout(p.build());
-                setOpen(false);
-              }}
+              onClick={() => apply(p.build())}
               title={p.description}
             >
               {p.name}
             </button>
           ))}
-          <div className="dropdown-section">Slots</div>
-          {SLOT_ORDER.map((id) => (
-            <label key={id} className="dropdown-item slot-row">
-              <input
-                type="checkbox"
-                checked={slots[id].visible}
-                onChange={(e) => setSlotVisible(id, e.target.checked)}
-              />
-              <span>{SLOT_LABELS[id]}</span>
-              <span className="slot-row-view">{VIEW_LABELS[slots[id].view]}</span>
-            </label>
+
+          <div className="dropdown-section">Custom</div>
+          {customs.list.length === 0 && (
+            <div className="dropdown-empty">No saved layouts yet.</div>
+          )}
+          {customs.list.map((c) => (
+            <div className="bookmark-row" key={c.id}>
+              <button
+                className="dropdown-item bookmark-item"
+                onClick={() => apply(c.layout)}
+                title={`Apply ${c.name}`}
+              >
+                {c.name}
+              </button>
+              <button
+                className="bookmark-remove"
+                onClick={() => customs.remove(c.id)}
+                title={`Delete ${c.name}`}
+              >
+                ×
+              </button>
+            </div>
           ))}
+          <button className="dropdown-item" onClick={saveAsCustom}>
+            + Save current as…
+          </button>
         </div>
       )}
     </div>

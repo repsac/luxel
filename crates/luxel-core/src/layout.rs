@@ -10,69 +10,79 @@ pub enum ViewId {
     Empty,
 }
 
-/// Identifies one of the three layout slots.
+/// Top-level layout geometry. Each shape defines a fixed number of slots and
+/// how they pack inside the main area. Slots themselves are anonymous
+/// (indexed 0/1/2) and get their visual position from the shape.
 ///
-/// `TopLeft` and `TopRight` share the top row horizontally. `Bottom` is the
-/// full-width row beneath them. Any slot can host any view, and any slot can
-/// be hidden — combined with the `maximized` field this lets the user build
-/// arbitrary configurations from a fixed three-slot skeleton.
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash)]
+/// `Single`           → [0]
+/// `TwoAcross`        → [0] | [1]
+/// `TwoTopOneBottom`  → top row [0] | [1] / bottom [2]
+/// `OneTopTwoBottom`  → top [0] / bottom row [1] | [2]
+/// `OneLeftTwoRight`  → left [0] | right column [1] / [2]
+/// `TwoLeftOneRight`  → left column [0] / [1] | right [2]
+/// `ThreeAcross`      → [0] | [1] | [2]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
-pub enum SlotId {
-    TopLeft,
-    TopRight,
-    Bottom,
+pub enum LayoutShape {
+    Single,
+    TwoAcross,
+    TwoTopOneBottom,
+    OneTopTwoBottom,
+    OneLeftTwoRight,
+    TwoLeftOneRight,
+    ThreeAcross,
+}
+
+impl LayoutShape {
+    /// Number of slots this shape places.
+    pub const fn slot_count(self) -> usize {
+        match self {
+            LayoutShape::Single => 1,
+            LayoutShape::TwoAcross => 2,
+            LayoutShape::TwoTopOneBottom
+            | LayoutShape::OneTopTwoBottom
+            | LayoutShape::OneLeftTwoRight
+            | LayoutShape::TwoLeftOneRight
+            | LayoutShape::ThreeAcross => 3,
+        }
+    }
+}
+
+impl Default for LayoutShape {
+    fn default() -> Self {
+        LayoutShape::TwoTopOneBottom
+    }
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
 pub struct SlotState {
     pub view: ViewId,
-    pub visible: bool,
 }
 
 impl SlotState {
     pub const fn new(view: ViewId) -> Self {
-        Self { view, visible: true }
+        Self { view }
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct LayoutSlots {
-    #[serde(rename = "topLeft")]
-    pub top_left: SlotState,
-    #[serde(rename = "topRight")]
-    pub top_right: SlotState,
-    pub bottom: SlotState,
-}
-
-impl Default for LayoutSlots {
-    fn default() -> Self {
-        Self {
-            top_left: SlotState::new(ViewId::Render),
-            top_right: SlotState::new(ViewId::Editor),
-            bottom: SlotState::new(ViewId::Console),
-        }
-    }
-}
-
-/// Sizes are fractional and stored separately from the slot assignment so the
-/// user can swap a view in/out of a slot without losing the splitter positions.
+/// Splitter positions, expressed as fractions in [0, 1] of the relevant axis.
+///
+/// Meaning depends on shape:
+///   * `primary` is the outer split (left vs right, or top vs bottom).
+///   * `secondary` is the inner split inside the multi-pane half of the shape.
+///     For three-across it's the split between the second and third panes
+///     (within the area after `primary`).
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
 pub struct LayoutSizes {
-    /// Fraction (0..1) of the total height taken by the bottom row.
-    #[serde(rename = "bottomFraction")]
-    pub bottom_fraction: f32,
-    /// Fraction (0..1) of the top row's width taken by the left slot.
-    /// The right slot takes 1 - top_left_fraction.
-    #[serde(rename = "topLeftFraction")]
-    pub top_left_fraction: f32,
+    pub primary: f32,
+    pub secondary: f32,
 }
 
 impl Default for LayoutSizes {
     fn default() -> Self {
         Self {
-            bottom_fraction: 0.25,
-            top_left_fraction: 0.55,
+            primary: 0.7,
+            secondary: 0.55,
         }
     }
 }
@@ -80,18 +90,29 @@ impl Default for LayoutSizes {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct LayoutState {
     #[serde(default)]
-    pub slots: LayoutSlots,
+    pub shape: LayoutShape,
+    #[serde(default = "default_slots_for_balanced")]
+    pub slots: Vec<SlotState>,
     #[serde(default)]
     pub sizes: LayoutSizes,
-    /// If set, that slot fills the whole layout area until restored.
+    /// Index into `slots`; when `Some`, that slot fills the whole layout area.
     #[serde(default)]
-    pub maximized: Option<SlotId>,
+    pub maximized: Option<usize>,
+}
+
+fn default_slots_for_balanced() -> Vec<SlotState> {
+    vec![
+        SlotState::new(ViewId::Render),
+        SlotState::new(ViewId::Editor),
+        SlotState::new(ViewId::Console),
+    ]
 }
 
 impl Default for LayoutState {
     fn default() -> Self {
         Self {
-            slots: LayoutSlots::default(),
+            shape: LayoutShape::TwoTopOneBottom,
+            slots: default_slots_for_balanced(),
             sizes: LayoutSizes::default(),
             maximized: None,
         }
@@ -99,16 +120,17 @@ impl Default for LayoutState {
 }
 
 impl LayoutState {
-    pub fn maximize(&mut self, slot: SlotId) {
-        self.maximized = Some(slot);
+    pub fn maximize(&mut self, slot: usize) {
+        if slot < self.slots.len() {
+            self.maximized = Some(slot);
+        }
     }
     pub fn restore(&mut self) {
         self.maximized = None;
     }
 }
 
-// Back-compat type aliases for any other code (or examples) that still
-// references the v1 names.
+// Back-compat type alias for any other code that still references the older name.
 pub type PanelState = SlotState;
 
 #[cfg(test)]
@@ -126,24 +148,30 @@ mod tests {
     #[test]
     fn maximize_restore() {
         let mut l = LayoutState::default();
-        l.maximize(SlotId::TopLeft);
-        assert_eq!(l.maximized, Some(SlotId::TopLeft));
+        l.maximize(0);
+        assert_eq!(l.maximized, Some(0));
         l.restore();
         assert_eq!(l.maximized, None);
     }
 
     #[test]
-    fn view_id_serializes_lowercase() {
-        let s = serde_json::to_string(&ViewId::Render).unwrap();
-        assert_eq!(s, "\"render\"");
-        let s = serde_json::to_string(&ViewId::Empty).unwrap();
-        assert_eq!(s, "\"empty\"");
+    fn maximize_out_of_range_is_noop() {
+        let mut l = LayoutState::default();
+        l.maximize(99);
+        assert_eq!(l.maximized, None);
     }
 
     #[test]
-    fn slot_id_serializes_camel_case() {
-        assert_eq!(serde_json::to_string(&SlotId::TopLeft).unwrap(), "\"topLeft\"");
-        assert_eq!(serde_json::to_string(&SlotId::TopRight).unwrap(), "\"topRight\"");
-        assert_eq!(serde_json::to_string(&SlotId::Bottom).unwrap(), "\"bottom\"");
+    fn view_id_serializes_lowercase() {
+        assert_eq!(serde_json::to_string(&ViewId::Render).unwrap(), "\"render\"");
+        assert_eq!(serde_json::to_string(&ViewId::Empty).unwrap(), "\"empty\"");
+    }
+
+    #[test]
+    fn shape_slot_counts() {
+        assert_eq!(LayoutShape::Single.slot_count(), 1);
+        assert_eq!(LayoutShape::TwoAcross.slot_count(), 2);
+        assert_eq!(LayoutShape::TwoTopOneBottom.slot_count(), 3);
+        assert_eq!(LayoutShape::ThreeAcross.slot_count(), 3);
     }
 }

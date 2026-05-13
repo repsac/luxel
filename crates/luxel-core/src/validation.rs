@@ -1,6 +1,6 @@
 use thiserror::Error;
 
-use crate::{CameraError, SceneFile, SCHEMA_VERSION};
+use crate::{CameraError, SceneFile, TimelineError, SCHEMA_VERSION};
 
 #[derive(Debug, Error, PartialEq)]
 pub enum ValidationError {
@@ -18,8 +18,12 @@ pub enum ValidationError {
     EmptyEntryPoint,
     #[error("camera: {0}")]
     Camera(#[from] CameraError),
+    #[error("timeline: {0}")]
+    Timeline(#[from] TimelineError),
     #[error("bookmark id '{0}' is duplicated")]
     DuplicateBookmarkId(String),
+    #[error("layout has {0} slots but shape requires {1}")]
+    LayoutSlotCount(usize, usize),
 }
 
 pub fn validate_scene(file: &SceneFile) -> Result<(), ValidationError> {
@@ -46,6 +50,13 @@ pub fn validate_scene(file: &SceneFile) -> Result<(), ValidationError> {
         return Err(ValidationError::EmptyEntryPoint);
     }
     file.scene.camera.validate()?;
+    file.scene.timeline.validate()?;
+
+    let expected_slots = file.scene.layout.shape.slot_count();
+    let actual_slots = file.scene.layout.slots.len();
+    if actual_slots != expected_slots {
+        return Err(ValidationError::LayoutSlotCount(actual_slots, expected_slots));
+    }
 
     let mut seen = std::collections::HashSet::new();
     for b in &file.scene.camera_bookmarks {

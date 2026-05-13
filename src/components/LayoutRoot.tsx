@@ -1,12 +1,20 @@
 import { useRef, type ReactNode } from "react";
-import { useSceneStore, type SlotId, type ViewId } from "../state/sceneStore";
+import {
+  type LayoutShape,
+  type SlotState,
+  type ViewId,
+  useSceneStore,
+} from "../state/sceneStore";
 import RenderView from "./RenderView";
 import ShaderEditor from "./ShaderEditor";
 import ConsolePanel from "./ConsolePanel";
 import StatusLine from "./StatusLine";
 import Toolbar from "./Toolbar";
+import PlaybackBar from "./PlaybackBar";
 import Splitter from "./Splitter";
 import SlotFrame from "./SlotFrame";
+
+const MIN_FRACTION = 0.08;
 
 export default function LayoutRoot() {
   const file = useSceneStore((s) => s.file);
@@ -14,95 +22,293 @@ export default function LayoutRoot() {
 
   const mainRef = useRef<HTMLDivElement | null>(null);
   const topRef = useRef<HTMLDivElement | null>(null);
+  const bottomRef = useRef<HTMLDivElement | null>(null);
+  const leftColRef = useRef<HTMLDivElement | null>(null);
+  const rightColRef = useRef<HTMLDivElement | null>(null);
 
   if (!file) {
     return <div className="loading">Loading Luxel…</div>;
   }
 
   const layout = file.scene.layout;
+
+  // Maximized branch — single panel fills the whole main area regardless of
+  // shape. We render the maximized slot's frame so the user still sees the
+  // "restore" button to come back.
+  if (layout.maximized != null && layout.maximized < layout.slots.length) {
+    const i = layout.maximized;
+    const s = layout.slots[i];
+    return (
+      <Shell>
+        <div className="cell" style={{ width: "100%", height: "100%" }}>
+          <SlotFrame slotIndex={i} view={s.view}>
+            {renderView(s.view)}
+          </SlotFrame>
+        </div>
+      </Shell>
+    );
+  }
+
   const slots = layout.slots;
+  const primary = clamp(layout.sizes.primary, MIN_FRACTION, 1 - MIN_FRACTION);
+  const secondary = clamp(layout.sizes.secondary, MIN_FRACTION, 1 - MIN_FRACTION);
 
-  // Decide what's actually visible. A maximized slot overrides everything;
-  // otherwise we honor each slot's visibility.
-  const max = layout.maximized;
-  const topLeftVisible = !max ? slots.topLeft.visible : max === "topLeft";
-  const topRightVisible = !max ? slots.topRight.visible : max === "topRight";
-  const bottomVisible = !max ? slots.bottom.visible : max === "bottom";
+  const onPrimary = (v: number) => setLayoutSizes({ primary: v });
+  const onSecondary = (v: number) => setLayoutSizes({ secondary: v });
 
-  const hasTop = topLeftVisible || topRightVisible;
-  const hasBottom = bottomVisible;
+  let content: ReactNode;
+  switch (layout.shape) {
+    case "single":
+      content = <SlotCell index={0} slot={slots[0]} />;
+      break;
 
-  // Normalize fractions. If the bottom row is hidden it gets 0; if only the
-  // top is hidden, the bottom takes the whole area.
-  const bottomFrac =
-    hasTop && hasBottom
-      ? clamp(layout.sizes.bottomFraction, 0.05, 0.95)
-      : hasBottom
-        ? 1
-        : 0;
-  const topFrac = 1 - bottomFrac;
+    case "twoAcross":
+      content = (
+        <div className="row" style={{ height: "100%" }} ref={mainRef}>
+          <Cell width={primary}>
+            <SlotCell index={0} slot={slots[0]} />
+          </Cell>
+          <Splitter
+            orientation="vertical"
+            fraction={primary}
+            containerRef={mainRef}
+            onFractionChange={onPrimary}
+          />
+          <Cell width={1 - primary}>
+            <SlotCell index={1} slot={slots[1]} />
+          </Cell>
+        </div>
+      );
+      break;
 
-  const leftFrac =
-    topLeftVisible && topRightVisible
-      ? clamp(layout.sizes.topLeftFraction, 0.05, 0.95)
-      : topLeftVisible
-        ? 1
-        : 0;
+    case "twoTopOneBottom":
+      content = (
+        <Stack
+          mainRef={mainRef}
+          primary={primary}
+          onPrimary={onPrimary}
+          top={
+            <div className="row" style={{ height: "100%" }} ref={topRef}>
+              <Cell width={secondary}>
+                <SlotCell index={0} slot={slots[0]} />
+              </Cell>
+              <Splitter
+                orientation="vertical"
+                fraction={secondary}
+                containerRef={topRef}
+                onFractionChange={onSecondary}
+              />
+              <Cell width={1 - secondary}>
+                <SlotCell index={1} slot={slots[1]} />
+              </Cell>
+            </div>
+          }
+          bottom={<SlotCell index={2} slot={slots[2]} />}
+        />
+      );
+      break;
 
+    case "oneTopTwoBottom":
+      content = (
+        <Stack
+          mainRef={mainRef}
+          primary={primary}
+          onPrimary={onPrimary}
+          top={<SlotCell index={0} slot={slots[0]} />}
+          bottom={
+            <div className="row" style={{ height: "100%" }} ref={bottomRef}>
+              <Cell width={secondary}>
+                <SlotCell index={1} slot={slots[1]} />
+              </Cell>
+              <Splitter
+                orientation="vertical"
+                fraction={secondary}
+                containerRef={bottomRef}
+                onFractionChange={onSecondary}
+              />
+              <Cell width={1 - secondary}>
+                <SlotCell index={2} slot={slots[2]} />
+              </Cell>
+            </div>
+          }
+        />
+      );
+      break;
+
+    case "oneLeftTwoRight":
+      content = (
+        <div className="row" style={{ height: "100%" }} ref={mainRef}>
+          <Cell width={primary}>
+            <SlotCell index={0} slot={slots[0]} />
+          </Cell>
+          <Splitter
+            orientation="vertical"
+            fraction={primary}
+            containerRef={mainRef}
+            onFractionChange={onPrimary}
+          />
+          <Cell width={1 - primary}>
+            <div className="column-stack" ref={rightColRef}>
+              <CellVertical height={secondary}>
+                <SlotCell index={1} slot={slots[1]} />
+              </CellVertical>
+              <Splitter
+                orientation="horizontal"
+                fraction={secondary}
+                containerRef={rightColRef}
+                onFractionChange={onSecondary}
+              />
+              <CellVertical height={1 - secondary}>
+                <SlotCell index={2} slot={slots[2]} />
+              </CellVertical>
+            </div>
+          </Cell>
+        </div>
+      );
+      break;
+
+    case "twoLeftOneRight":
+      content = (
+        <div className="row" style={{ height: "100%" }} ref={mainRef}>
+          <Cell width={primary}>
+            <div className="column-stack" ref={leftColRef}>
+              <CellVertical height={secondary}>
+                <SlotCell index={0} slot={slots[0]} />
+              </CellVertical>
+              <Splitter
+                orientation="horizontal"
+                fraction={secondary}
+                containerRef={leftColRef}
+                onFractionChange={onSecondary}
+              />
+              <CellVertical height={1 - secondary}>
+                <SlotCell index={1} slot={slots[1]} />
+              </CellVertical>
+            </div>
+          </Cell>
+          <Splitter
+            orientation="vertical"
+            fraction={primary}
+            containerRef={mainRef}
+            onFractionChange={onPrimary}
+          />
+          <Cell width={1 - primary}>
+            <SlotCell index={2} slot={slots[2]} />
+          </Cell>
+        </div>
+      );
+      break;
+
+    case "threeAcross": {
+      // primary = boundary between slot 0 and the (slot 1 + slot 2) area.
+      // secondary = boundary inside that remainder between slot 1 and slot 2.
+      const rest = 1 - primary;
+      const middle = rest * secondary;
+      const right = rest - middle;
+      content = (
+        <div className="row" style={{ height: "100%" }} ref={mainRef}>
+          <Cell width={primary}>
+            <SlotCell index={0} slot={slots[0]} />
+          </Cell>
+          <Splitter
+            orientation="vertical"
+            fraction={primary}
+            containerRef={mainRef}
+            onFractionChange={onPrimary}
+          />
+          <Cell width={middle}>
+            <SlotCell index={1} slot={slots[1]} />
+          </Cell>
+          <Splitter
+            orientation="vertical"
+            // The second splitter's "absolute" position is primary + middle.
+            fraction={primary + middle}
+            containerRef={mainRef}
+            onFractionChange={(f) => {
+              // Convert the absolute drag position back into "secondary"
+              // (fraction inside the remainder).
+              if (rest <= MIN_FRACTION) return;
+              const newSecondary = clamp(
+                (f - primary) / rest,
+                MIN_FRACTION,
+                1 - MIN_FRACTION,
+              );
+              onSecondary(newSecondary);
+            }}
+          />
+          <Cell width={right}>
+            <SlotCell index={2} slot={slots[2]} />
+          </Cell>
+        </div>
+      );
+      break;
+    }
+  }
+
+  return <Shell>{content}</Shell>;
+}
+
+function Shell({ children }: { children: ReactNode }) {
   return (
     <div className="layout-root">
       <div className="toolbar-area">
         <Toolbar />
       </div>
-      <div className="main-area" ref={mainRef}>
-        {hasTop && (
-          <div className="row top-row" style={{ height: `${topFrac * 100}%` }} ref={topRef}>
-            {topLeftVisible && (
-              <div className="cell" style={{ width: `${leftFrac * 100}%` }}>
-                <SlotFrame slot="topLeft" view={slots.topLeft.view}>
-                  {renderView(slots.topLeft.view)}
-                </SlotFrame>
-              </div>
-            )}
-            {topLeftVisible && topRightVisible && (
-              <Splitter
-                orientation="vertical"
-                fraction={leftFrac}
-                containerRef={topRef}
-                onFractionChange={(f) => setLayoutSizes({ topLeftFraction: f })}
-              />
-            )}
-            {topRightVisible && (
-              <div className="cell" style={{ width: `${(1 - leftFrac) * 100}%` }}>
-                <SlotFrame slot="topRight" view={slots.topRight.view}>
-                  {renderView(slots.topRight.view)}
-                </SlotFrame>
-              </div>
-            )}
-          </div>
-        )}
-        {hasTop && hasBottom && (
-          <Splitter
-            orientation="horizontal"
-            fraction={topFrac}
-            containerRef={mainRef}
-            onFractionChange={(f) => setLayoutSizes({ bottomFraction: 1 - f })}
-          />
-        )}
-        {hasBottom && (
-          <div className="row bottom-row" style={{ height: `${bottomFrac * 100}%` }}>
-            <div className="cell" style={{ width: "100%" }}>
-              <SlotFrame slot="bottom" view={slots.bottom.view}>
-                {renderView(slots.bottom.view)}
-              </SlotFrame>
-            </div>
-          </div>
-        )}
+      <div className="main-area">{children}</div>
+      <div className="playback-area">
+        <PlaybackBar />
       </div>
       <div className="status-area">
         <StatusLine />
       </div>
     </div>
+  );
+}
+
+interface StackProps {
+  mainRef: React.RefObject<HTMLDivElement>;
+  primary: number;
+  onPrimary: (v: number) => void;
+  top: ReactNode;
+  bottom: ReactNode;
+}
+
+function Stack({ mainRef, primary, onPrimary, top, bottom }: StackProps) {
+  return (
+    <div className="column-stack" ref={mainRef}>
+      <CellVertical height={primary}>{top}</CellVertical>
+      <Splitter
+        orientation="horizontal"
+        fraction={primary}
+        containerRef={mainRef}
+        onFractionChange={onPrimary}
+      />
+      <CellVertical height={1 - primary}>{bottom}</CellVertical>
+    </div>
+  );
+}
+
+function Cell({ width, children }: { width: number; children: ReactNode }) {
+  return (
+    <div className="cell" style={{ width: `${width * 100}%`, height: "100%" }}>
+      {children}
+    </div>
+  );
+}
+
+function CellVertical({ height, children }: { height: number; children: ReactNode }) {
+  return (
+    <div className="cell" style={{ height: `${height * 100}%`, width: "100%" }}>
+      {children}
+    </div>
+  );
+}
+
+function SlotCell({ index, slot }: { index: number; slot: SlotState }) {
+  return (
+    <SlotFrame slotIndex={index} view={slot.view}>
+      {renderView(slot.view)}
+    </SlotFrame>
   );
 }
 
@@ -131,5 +337,4 @@ function clamp(x: number, lo: number, hi: number): number {
   return Math.max(lo, Math.min(hi, x));
 }
 
-// Avoid an unused warning when SlotId is only imported as a type alias above.
-export type { SlotId };
+export type { LayoutShape };

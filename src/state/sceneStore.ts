@@ -1,23 +1,49 @@
 import { create } from "zustand";
 
 export type ViewId = "render" | "editor" | "console" | "empty";
-export type SlotId = "topLeft" | "topRight" | "bottom";
+
+export type LayoutShape =
+  | "single"
+  | "twoAcross"
+  | "twoTopOneBottom"
+  | "oneTopTwoBottom"
+  | "oneLeftTwoRight"
+  | "twoLeftOneRight"
+  | "threeAcross";
 
 export interface SlotState {
   view: ViewId;
-  visible: boolean;
 }
 
 export interface LayoutSizes {
-  bottomFraction: number;
-  topLeftFraction: number;
+  primary: number;
+  secondary: number;
 }
 
 export interface LayoutState {
-  slots: Record<SlotId, SlotState>;
+  shape: LayoutShape;
+  slots: SlotState[];
   sizes: LayoutSizes;
-  maximized: SlotId | null;
+  /// Index into `slots`. When set, that slot fills the entire main area.
+  maximized: number | null;
 }
+
+export interface TimelineState {
+  firstFrame: number;
+  lastFrame: number;
+  currentFrame: number;
+  targetFps: number;
+}
+
+export const SHAPE_SLOT_COUNT: Record<LayoutShape, number> = {
+  single: 1,
+  twoAcross: 2,
+  twoTopOneBottom: 3,
+  oneTopTwoBottom: 3,
+  oneLeftTwoRight: 3,
+  twoLeftOneRight: 3,
+  threeAcross: 3,
+};
 
 export interface CameraState {
   position: [number, number, number];
@@ -59,6 +85,7 @@ export interface Scene {
   camera: CameraState;
   cameraBookmarks: CameraBookmark[];
   layout: LayoutState;
+  timeline: TimelineState;
 }
 
 export interface SceneFile {
@@ -78,10 +105,11 @@ interface SceneStore {
   addBookmark: (b: CameraBookmark) => void;
   removeBookmark: (id: string) => void;
   setLayout: (layout: LayoutState) => void;
-  setSlotView: (slot: SlotId, view: ViewId) => void;
-  setSlotVisible: (slot: SlotId, visible: boolean) => void;
+  setSlotView: (slotIndex: number, view: ViewId) => void;
   setLayoutSizes: (patch: Partial<LayoutSizes>) => void;
-  setMaximized: (slot: SlotId | null) => void;
+  setMaximized: (slotIndex: number | null) => void;
+  setTimeline: (patch: Partial<TimelineState>) => void;
+  setCurrentFrame: (frame: number) => void;
   markSaved: (path: string) => void;
 }
 
@@ -180,34 +208,17 @@ export const useSceneStore = create<SceneStore>((set) => ({
           }
         : s,
     ),
-  setSlotView: (slot, view) =>
-    set((s) =>
-      s.file
-        ? {
-            file: patchLayout(s.file, {
-              slots: {
-                ...s.file.scene.layout.slots,
-                [slot]: { ...s.file.scene.layout.slots[slot], view },
-              },
-            }),
-            dirty: true,
-          }
-        : s,
-    ),
-  setSlotVisible: (slot, visible) =>
-    set((s) =>
-      s.file
-        ? {
-            file: patchLayout(s.file, {
-              slots: {
-                ...s.file.scene.layout.slots,
-                [slot]: { ...s.file.scene.layout.slots[slot], visible },
-              },
-            }),
-            dirty: true,
-          }
-        : s,
-    ),
+  setSlotView: (slotIndex, view) =>
+    set((s) => {
+      if (!s.file) return s;
+      const slots = s.file.scene.layout.slots.slice();
+      if (slotIndex < 0 || slotIndex >= slots.length) return s;
+      slots[slotIndex] = { ...slots[slotIndex], view };
+      return {
+        file: patchLayout(s.file, { slots }),
+        dirty: true,
+      };
+    }),
   setLayoutSizes: (patch) =>
     set((s) =>
       s.file
@@ -219,14 +230,48 @@ export const useSceneStore = create<SceneStore>((set) => ({
           }
         : s,
     ),
-  setMaximized: (slot) =>
+  setMaximized: (slotIndex) =>
     set((s) =>
       s.file
         ? {
-            file: patchLayout(s.file, { maximized: slot }),
+            file: patchLayout(s.file, { maximized: slotIndex }),
             dirty: true,
           }
         : s,
     ),
+  setTimeline: (patch) =>
+    set((s) =>
+      s.file
+        ? {
+            file: {
+              ...s.file,
+              scene: {
+                ...s.file.scene,
+                timeline: { ...s.file.scene.timeline, ...patch },
+              },
+            },
+            dirty: true,
+          }
+        : s,
+    ),
+  setCurrentFrame: (frame) =>
+    set((s) => {
+      if (!s.file) return s;
+      const t = s.file.scene.timeline;
+      const clamped = Math.max(t.firstFrame, Math.min(t.lastFrame, Math.round(frame)));
+      // Don't dirty the file for currentFrame motion during playback — it
+      // would otherwise mark every saved scene as modified after a single
+      // tick of the play loop. Only scrubs/edits originating from user
+      // interaction should set dirty.
+      return {
+        file: {
+          ...s.file,
+          scene: {
+            ...s.file.scene,
+            timeline: { ...t, currentFrame: clamped },
+          },
+        },
+      };
+    }),
   markSaved: (path) => set({ dirty: false, path }),
 }));

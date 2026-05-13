@@ -25,8 +25,10 @@ interface AppStore {
   lastRender: LastRender | null;
   shaderDiagnostics: ShaderDiagnostic[];
   lastShaderError: ConsoleEvent | null;
-  iTime: number;
-  iFrame: number;
+  /// Whether the playback driver is currently advancing the timeline.
+  isPlaying: boolean;
+  /// +1 = play forward, -1 = play backward. Ignored when `isPlaying` is false.
+  playDirection: 1 | -1;
   renderCanvas: HTMLCanvasElement | null;
   /// Pixel size of the render viewport — drives iResolution so the preview
   /// always fills the panel. Cap is enforced by the consumer.
@@ -47,8 +49,9 @@ interface AppStore {
   setLastRender: (r: LastRender) => void;
   setShaderError: (e: ConsoleEvent | null) => void;
   setShaderDiagnostics: (d: ShaderDiagnostic[]) => void;
-  setITime: (t: number) => void;
-  setIFrame: (f: number) => void;
+  play: (direction?: 1 | -1) => void;
+  pause: () => void;
+  togglePlay: (direction?: 1 | -1) => void;
   setRenderCanvas: (c: HTMLCanvasElement | null) => void;
   setPreviewSize: (w: number, h: number) => void;
   setRenderQuality: (q: number) => void;
@@ -141,8 +144,8 @@ export const useAppStore = create<AppStore>((set) => ({
   lastRender: null,
   shaderDiagnostics: [],
   lastShaderError: null,
-  iTime: 0,
-  iFrame: 0,
+  isPlaying: false,
+  playDirection: 1,
   renderCanvas: null,
   previewWidth: 0,
   previewHeight: 0,
@@ -154,8 +157,21 @@ export const useAppStore = create<AppStore>((set) => ({
   setLastRender: (r) => set({ lastRender: r }),
   setShaderError: (e) => set({ lastShaderError: e }),
   setShaderDiagnostics: (d) => set({ shaderDiagnostics: d }),
-  setITime: (t) => set({ iTime: t }),
-  setIFrame: (f) => set({ iFrame: f }),
+  play: (direction = 1) => set({ isPlaying: true, playDirection: direction }),
+  pause: () => set({ isPlaying: false }),
+  togglePlay: (direction) =>
+    set((s) => {
+      // Pressing the same direction toggles off; pressing the opposite
+      // direction flips and keeps playing. Calling without a direction
+      // toggles isPlaying without changing direction.
+      if (direction === undefined) {
+        return { isPlaying: !s.isPlaying };
+      }
+      if (s.isPlaying && s.playDirection === direction) {
+        return { isPlaying: false };
+      }
+      return { isPlaying: true, playDirection: direction };
+    }),
   setRenderCanvas: (c) => set({ renderCanvas: c }),
   setPreviewSize: (w, h) => set({ previewWidth: w, previewHeight: h }),
   setRenderQuality: (q) => set({ renderQuality: Math.min(2.0, Math.max(0.25, q)) }),

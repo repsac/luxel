@@ -98,10 +98,52 @@ export default function HelpModal({ open, onClose }: Props) {
             </table>
             <p className="hint">
               A render driver re-fires on the next animation frame whenever the
-              camera, render size, or iTime changes — same model as a DCC
-              viewport, so navigation is smooth. Editing shader source does{" "}
+              camera, render size, or current frame changes — same model as a
+              DCC viewport, so navigation is smooth. Editing shader source does{" "}
               <em>not</em> auto-render; use <kbd>Cmd/Ctrl</kbd>+<kbd>Enter</kbd>
               {" "}to recompile.
+            </p>
+          </section>
+          <section>
+            <h3>Timeline (playback bar at the bottom)</h3>
+            <table>
+              <tbody>
+                <tr><td>⏮ / ⏭</td><td>Jump to first / last frame</td></tr>
+                <tr><td>⏴ / ⏵</td><td>Step one frame backward / forward</td></tr>
+                <tr><td>◀ / ▶</td><td>Play backward / forward; click again to pause</td></tr>
+                <tr><td>Slider</td><td>Scrub the playhead (pauses playback)</td></tr>
+                <tr><td>First / Last / FPS</td><td>Edit timeline bounds and playback rate</td></tr>
+                <tr>
+                  <td><kbd>Space</kbd></td>
+                  <td>Play forward / pause</td>
+                </tr>
+                <tr>
+                  <td><kbd>Shift</kbd>+<kbd>Space</kbd></td>
+                  <td>Play backward / pause</td>
+                </tr>
+                <tr>
+                  <td><kbd>←</kbd> / <kbd>→</kbd></td>
+                  <td>Step one frame back / forward</td>
+                </tr>
+                <tr>
+                  <td><kbd>Home</kbd> / <kbd>End</kbd></td>
+                  <td>Jump to first / last frame</td>
+                </tr>
+                <tr>
+                  <td>
+                    <kbd>Cmd/Ctrl</kbd>+<kbd>←</kbd> /{" "}
+                    <kbd>Cmd/Ctrl</kbd>+<kbd>→</kbd>
+                  </td>
+                  <td>Jump to first / last frame (alias for Home/End)</td>
+                </tr>
+              </tbody>
+            </table>
+            <p className="hint">
+              <code>iFrame = currentFrame</code> and{" "}
+              <code>iTime = currentFrame / targetFps</code>. The playhead value
+              is saved with the scene; playing/paused state is not. Playback
+              hotkeys are suppressed while you're typing in the editor or an
+              input field so they don't hijack normal text editing.
             </p>
           </section>
           <section>
@@ -109,8 +151,8 @@ export default function HelpModal({ open, onClose }: Props) {
             <p>Available in every Shadertoy-style fragment shader:</p>
             <pre>
               {`vec3  iResolution        // viewport size in pixels (x, y, 1)
-float iTime              // slider in the toolbar
-int   iFrame
+float iTime              // currentFrame / targetFps
+int   iFrame             // currentFrame
 vec4  iMouse
 vec3  iCameraPosition    // world-space camera position
 float iCameraFov         // vertical, radians

@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::{CameraBookmark, CameraState, LayoutState, RenderSettings};
+use crate::{CameraBookmark, CameraState, LayoutState, RenderSettings, TimelineState};
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
@@ -65,6 +65,10 @@ pub struct Scene {
     #[serde(rename = "cameraBookmarks")]
     pub camera_bookmarks: Vec<CameraBookmark>,
     pub layout: LayoutState,
+    /// Frame-based timeline (`firstFrame`, `lastFrame`, `currentFrame`,
+    /// `targetFps`). Persisted so a scene reopens at the same playhead.
+    #[serde(default)]
+    pub timeline: TimelineState,
 }
 
 impl Default for Scene {
@@ -76,6 +80,7 @@ impl Default for Scene {
             camera: CameraState::default(),
             camera_bookmarks: vec![CameraBookmark::default_bookmark()],
             layout: LayoutState::default(),
+            timeline: TimelineState::default(),
         }
     }
 }
