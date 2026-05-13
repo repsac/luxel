@@ -140,6 +140,25 @@ button.primary:hover { background: #3580f0; }
   letter-spacing: 0.04em;
   margin-right: 8px;
   color: #7ad3ff;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+}
+.brand-build {
+  font-weight: 400;
+  font-size: 10px;
+  letter-spacing: 0;
+  color: #5d6a78;
+  font-variant-numeric: tabular-nums;
+  font-family: ui-monospace, "JetBrains Mono", Menlo, monospace;
+}
+.brand-build-num {
+  margin-left: 2px;
+}
+.brand-build-dirty {
+  /* Soft warning tint so a dirty build stands out at a glance without
+     shouting. Hover for the full label including the hash. */
+  color: #f0c674;
 }
 .spacer { flex: 1; }
 .scene-name { color: #8b97a6; }
@@ -175,6 +194,13 @@ button.primary:hover { background: #3580f0; }
   margin: 0;
   flex: 1;
   color: #7ad3ff;
+}
+.help-build {
+  font-family: ui-monospace, "JetBrains Mono", Menlo, monospace;
+  font-size: 11px;
+  color: #5d6a78;
+  margin-right: 12px;
+  user-select: text;
 }
 .help-body {
   padding: 14px 16px;

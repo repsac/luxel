@@ -4,6 +4,7 @@ mod app_state;
 mod commands;
 mod events;
 
+use tauri::Manager;
 use tracing_subscriber::{fmt, prelude::*, EnvFilter};
 
 pub fn run() {
@@ -37,10 +38,28 @@ pub fn run() {
         .setup(|app| {
             let handle = app.handle().clone();
             events::set_emitter(handle);
+            // Override the static "Luxel" title set in tauri.conf.json with a
+            // version + build-number label so users can identify the running
+            // build from the OS title bar. Format mirrors the in-app toolbar:
+            //   "Luxel v0.1.0 · #127"        (clean)
+            //   "Luxel v0.1.0 · #127-dirty"  (uncommitted changes)
+            //   "Luxel v0.1.0 · dev"         (no git history available)
+            let version = env!("CARGO_PKG_VERSION");
+            let number = env!("LUXEL_BUILD_NUMBER");
+            let dirty = env!("LUXEL_BUILD_DIRTY") == "true";
+            let number_part = if number == "dev" {
+                "dev".to_string()
+            } else {
+                format!("#{number}{}", if dirty { "-dirty" } else { "" })
+            };
+            let title = format!("Luxel v{version} · {number_part}");
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.set_title(&title);
+            }
             events::emit_console(
                 events::LogLevel::Info,
                 events::LogSource::App,
-                "Luxel started",
+                &format!("Luxel started ({})", title),
                 None,
             );
             Ok(())

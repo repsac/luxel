@@ -1,5 +1,42 @@
+import { execSync } from "node:child_process";
+import { readFileSync } from "node:fs";
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
+
+const pkg = JSON.parse(readFileSync("./package.json", "utf-8")) as { version: string };
+
+interface GitInfo {
+  /// Monotonic commit count on the current branch (`git rev-list --count HEAD`).
+  /// We display this with a leading `#` so it reads as a build number. Falls
+  /// back to the literal string "dev" when this isn't a git checkout.
+  number: string;
+  /// Short SHA — useful for diagnostics in the help modal even though it's
+  /// not the primary identifier.
+  hash: string;
+  /// True if the working tree has any tracked-or-untracked changes (anything
+  /// `git status --porcelain` would report). This lets us tag dev builds so
+  /// nobody mistakes an un-pushed change for a clean release.
+  dirty: boolean;
+}
+
+function captureGit(): GitInfo {
+  const run = (args: string[]): string =>
+    execSync(`git ${args.join(" ")}`, {
+      encoding: "utf-8",
+      stdio: ["ignore", "pipe", "ignore"],
+    }).trim();
+  try {
+    return {
+      number: run(["rev-list", "--count", "HEAD"]),
+      hash: run(["rev-parse", "--short", "HEAD"]),
+      dirty: run(["status", "--porcelain"]).length > 0,
+    };
+  } catch {
+    return { number: "dev", hash: "dev", dirty: false };
+  }
+}
+
+const git = captureGit();
 
 export default defineConfig({
   plugins: [react()],
@@ -9,13 +46,15 @@ export default defineConfig({
     strictPort: true,
   },
   envPrefix: ["VITE_", "TAURI_"],
+  define: {
+    __APP_VERSION__: JSON.stringify(pkg.version),
+    __BUILD_NUMBER__: JSON.stringify(git.number),
+    __BUILD_HASH__: JSON.stringify(git.hash),
+    __BUILD_DIRTY__: JSON.stringify(git.dirty),
+  },
   build: {
     target: "es2022",
     sourcemap: true,
-    // Default warning threshold is 500 kB. A desktop Tauri app doesn't ship
-    // over the wire, so chunk size matters far less than for a web app — we
-    // bump the threshold to silence the warning while keeping the codemirror
-    // editor chunk-split out via React.lazy() in ShaderEditor.tsx.
     chunkSizeWarningLimit: 1500,
   },
 });

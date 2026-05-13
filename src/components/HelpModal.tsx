@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { FULL_BUILD_LABEL } from "../build-info";
 
 interface Props {
   open: boolean;
@@ -24,6 +25,7 @@ export default function HelpModal({ open, onClose }: Props) {
       <div className="help-modal" onClick={(e) => e.stopPropagation()}>
         <header>
           <h2>Luxel quick reference</h2>
+          <span className="help-build">{FULL_BUILD_LABEL}</span>
           <button onClick={onClose}>✕</button>
         </header>
         <div className="help-body">

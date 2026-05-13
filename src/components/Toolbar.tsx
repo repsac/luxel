@@ -7,6 +7,12 @@ import { exportCanvasAsPng, renderScene } from "../actions/render";
 import { EXAMPLES, type ExampleShader } from "../examples";
 import LayoutMenu from "./LayoutMenu";
 import { HelpButton } from "./HelpModal";
+import {
+  APP_VERSION,
+  BUILD_DIRTY,
+  BUILD_NUMBER,
+  FULL_BUILD_LABEL,
+} from "../build-info";
 
 export default function Toolbar() {
   const file = useSceneStore((s) => s.file);
@@ -194,7 +200,19 @@ export default function Toolbar() {
 
   return (
     <div className="toolbar">
-      <span className="brand">Luxel</span>
+      <span className="brand">
+        Luxel
+        <span
+          className={`brand-build${BUILD_DIRTY ? " brand-build-dirty" : ""}`}
+          title={FULL_BUILD_LABEL}
+        >
+          v{APP_VERSION}
+          <span className="brand-build-num">
+            ·{BUILD_NUMBER === "dev" ? "dev" : `#${BUILD_NUMBER}`}
+            {BUILD_DIRTY ? "-dirty" : ""}
+          </span>
+        </span>
+      </span>
       <button onClick={newScene} title="Reset to default scene">
         New
       </button>
