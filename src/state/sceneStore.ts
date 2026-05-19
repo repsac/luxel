@@ -102,7 +102,15 @@ interface SceneStore {
   file: SceneFile | null;
   dirty: boolean;
   path: string | null;
+  /// When a built-in example is loaded *as-is*, this holds its `id`. Any
+  /// user edit, file load, save, or "new scene" action clears it back to
+  /// null. Used by the compatibility picker to decide whether it can
+  /// auto-swap to the paired example in the other mode.
+  loadedExampleId: string | null;
   replace: (file: SceneFile) => void;
+  /// Replace the scene from a built-in example load. Same as `replace`
+  /// but also records the example id and clears dirty.
+  replaceFromExample: (file: SceneFile, exampleId: string) => void;
   updateShaderSource: (source: string) => void;
   updateShaderCompatibility: (compat: ShaderCompatibility) => void;
   updateRenderSettings: (patch: Partial<RenderSettings>) => void;
@@ -129,7 +137,10 @@ export const useSceneStore = create<SceneStore>((set) => ({
   file: null,
   dirty: false,
   path: null,
-  replace: (file) => set({ file, dirty: false }),
+  loadedExampleId: null,
+  replace: (file) => set({ file, dirty: false, loadedExampleId: null }),
+  replaceFromExample: (file, exampleId) =>
+    set({ file, dirty: false, loadedExampleId: exampleId, path: null }),
   updateShaderSource: (source) =>
     set((s) =>
       s.file
@@ -142,6 +153,9 @@ export const useSceneStore = create<SceneStore>((set) => ({
               },
             },
             dirty: true,
+            // Any user edit dissociates from the loaded example so the
+            // compatibility picker stops trying to auto-swap.
+            loadedExampleId: null,
           }
         : s,
     ),
@@ -301,5 +315,8 @@ export const useSceneStore = create<SceneStore>((set) => ({
         },
       };
     }),
-  markSaved: (path) => set({ dirty: false, path }),
+  markSaved: (path) =>
+    // Saving to a real file means the user has adopted the content as their
+    // own work; it's no longer "an unmodified example".
+    set({ dirty: false, path, loadedExampleId: null }),
 }));

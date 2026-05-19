@@ -51,6 +51,54 @@ describe("editor font-size actions", () => {
   });
 });
 
+describe("frustum overlay preference", () => {
+  beforeEach(() => {
+    // Force the toggle off so each test starts from a known state. The
+    // backing localStorage may or may not be a full implementation under
+    // vitest 4's jsdom environment, so guard `removeItem` defensively.
+    try {
+      if (typeof localStorage?.removeItem === "function") {
+        localStorage.removeItem("luxel.showFrustumOverlay");
+      }
+    } catch {
+      /* ignore */
+    }
+    useAppStore.getState().setShowFrustumOverlay(false);
+  });
+
+  it("toggleFrustumOverlay flips the boolean", () => {
+    expect(useAppStore.getState().showFrustumOverlay).toBe(false);
+    useAppStore.getState().toggleFrustumOverlay();
+    expect(useAppStore.getState().showFrustumOverlay).toBe(true);
+    useAppStore.getState().toggleFrustumOverlay();
+    expect(useAppStore.getState().showFrustumOverlay).toBe(false);
+  });
+
+  it("setShowFrustumOverlay accepts explicit values", () => {
+    useAppStore.getState().setShowFrustumOverlay(true);
+    expect(useAppStore.getState().showFrustumOverlay).toBe(true);
+    useAppStore.getState().setShowFrustumOverlay(false);
+    expect(useAppStore.getState().showFrustumOverlay).toBe(false);
+  });
+
+  it("persists the toggle to localStorage when storage is available", () => {
+    // vitest 4's default jsdom environment stubs `localStorage` differently
+    // depending on options, so guard the assertion. The appStore code
+    // already silently no-ops on `localStorage` failure, which is the
+    // contract we actually care about — this assertion is the bonus check
+    // for the happy path.
+    const hasLs =
+      typeof localStorage !== "undefined" &&
+      typeof localStorage.getItem === "function" &&
+      typeof localStorage.setItem === "function";
+    if (!hasLs) return;
+    useAppStore.getState().setShowFrustumOverlay(true);
+    expect(localStorage.getItem("luxel.showFrustumOverlay")).toBe("true");
+    useAppStore.getState().setShowFrustumOverlay(false);
+    expect(localStorage.getItem("luxel.showFrustumOverlay")).toBe("false");
+  });
+});
+
 describe("computeFps", () => {
   it("returns 0 when there is no history", () => {
     expect(computeFps([], 1000)).toBe(0);

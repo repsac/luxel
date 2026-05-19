@@ -30,7 +30,11 @@ pub enum ShaderCompatibility {
 
 impl Default for ShaderCompatibility {
     fn default() -> Self {
-        Self::ShadertoyFragmentV1
+        // Raw GLSL is the default: most developers approaching Luxel from
+        // outside the shader-art community expect `void main()` semantics.
+        // Shadertoy mode remains a first-class alternative via the editor
+        // header's compatibility picker.
+        Self::RawFragmentV1
     }
 }
 
@@ -47,20 +51,38 @@ impl Default for ShaderSource {
     fn default() -> Self {
         Self {
             language: ShaderLanguage::Glsl,
-            source: DEFAULT_GLSL.to_string(),
-            entry_point: "mainImage".to_string(),
-            compatibility: ShaderCompatibility::ShadertoyFragmentV1,
+            source: DEFAULT_GLSL_RAW.to_string(),
+            entry_point: "main".to_string(),
+            compatibility: ShaderCompatibility::RawFragmentV1,
         }
     }
 }
 
-pub const DEFAULT_GLSL: &str = r#"void mainImage(out vec4 fragColor, in vec2 fragCoord)
+/// Default raw-GLSL shader source — a simple time-driven UV gradient written
+/// in `void main()` style. Used by `Scene::default()` and by `New Scene`.
+pub const DEFAULT_GLSL_RAW: &str = r#"// Raw GLSL — you own main(). The prelude supplies:
+//   in  vec2 v_uv;        // [0,0] bottom-left, [1,1] top-right
+//   out vec4 outColor;
+//   + uniforms (iResolution, iTime, iCameraPosition, ...)
+
+void main() {
+    vec2 uv = v_uv;
+    outColor = vec4(uv.x, uv.y, 0.35 + 0.25 * sin(iTime), 1.0);
+}
+"#;
+
+/// Equivalent Shadertoy-style default — used when the user explicitly switches
+/// the empty scene back to Shadertoy mode.
+pub const DEFAULT_GLSL_SHADERTOY: &str = r#"void mainImage(out vec4 fragColor, in vec2 fragCoord)
 {
     vec2 uv = fragCoord / iResolution.xy;
     vec3 color = vec3(uv.x, uv.y, 0.35 + 0.25 * sin(iTime));
     fragColor = vec4(color, 1.0);
 }
 "#;
+
+/// Back-compat alias for code that referenced the old single constant.
+pub const DEFAULT_GLSL: &str = DEFAULT_GLSL_RAW;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Scene {
@@ -128,5 +150,60 @@ mod tests {
         let s = Scene::default();
         assert_eq!(s.camera_bookmarks.len(), 1);
         assert_eq!(s.camera_bookmarks[0].id, "default");
+    }
+
+    #[test]
+    fn default_compatibility_is_raw() {
+        assert_eq!(
+            ShaderCompatibility::default(),
+            ShaderCompatibility::RawFragmentV1
+        );
+    }
+
+    #[test]
+    fn default_shader_source_is_raw_main() {
+        let src = ShaderSource::default();
+        assert_eq!(src.compatibility, ShaderCompatibility::RawFragmentV1);
+        assert_eq!(src.entry_point, "main");
+        // The default source must declare a `void main()` — anything else
+        // would fail to compile under the raw prelude.
+        assert!(
+            src.source.contains("void main()"),
+            "default source missing main(): {}",
+            src.source
+        );
+    }
+
+    #[test]
+    fn shadertoy_default_template_uses_main_image() {
+        // The Shadertoy default template is what the editor's compatibility
+        // picker drops in when the user flips back to Shadertoy mode; it
+        // must use the `mainImage` entry point.
+        assert!(
+            DEFAULT_GLSL_SHADERTOY.contains("void mainImage("),
+            "Shadertoy default template missing mainImage: {}",
+            DEFAULT_GLSL_SHADERTOY
+        );
+        assert!(!DEFAULT_GLSL_SHADERTOY.contains("void main()"));
+    }
+
+    #[test]
+    fn raw_default_uses_outcolor_not_fragcolor() {
+        // Quick guard so a stray refactor doesn't ship a raw template that
+        // assigns to `fragColor` (which only exists in Shadertoy mode).
+        assert!(DEFAULT_GLSL_RAW.contains("outColor"));
+        assert!(!DEFAULT_GLSL_RAW.contains("fragColor"));
+    }
+
+    #[test]
+    fn raw_and_shadertoy_compatibilities_serialize_with_expected_strings() {
+        assert_eq!(
+            serde_json::to_string(&ShaderCompatibility::ShadertoyFragmentV1).unwrap(),
+            "\"shadertoy-fragment-v1\""
+        );
+        assert_eq!(
+            serde_json::to_string(&ShaderCompatibility::RawFragmentV1).unwrap(),
+            "\"raw-fragment-v1\""
+        );
     }
 }

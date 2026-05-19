@@ -4,11 +4,11 @@ import { linter, type Diagnostic } from "@codemirror/lint";
 import { EditorView } from "@codemirror/view";
 import { useSceneStore, type ShaderCompatibility } from "../state/sceneStore";
 import { useAppStore } from "../state/appStore";
-
-const COMPATIBILITY_LABELS: Record<ShaderCompatibility, string> = {
-  "shadertoy-fragment-v1": "Shadertoy (mainImage)",
-  "raw-fragment-v1": "Raw GLSL (main)",
-};
+import {
+  defaultExampleFor,
+  findExample,
+  findPartnerExample,
+} from "../examples";
 import {
   MagnifierMinus,
   MagnifierPlus,
@@ -17,18 +17,24 @@ import {
 
 const CodeMirror = lazy(() => import("@uiw/react-codemirror"));
 
+const COMPATIBILITY_LABELS: Record<ShaderCompatibility, string> = {
+  "shadertoy-fragment-v1": "Shadertoy (mainImage)",
+  "raw-fragment-v1": "Raw GLSL (main)",
+};
+
 export default function ShaderEditor() {
   const file = useSceneStore((s) => s.file);
+  const dirty = useSceneStore((s) => s.dirty);
+  const loadedExampleId = useSceneStore((s) => s.loadedExampleId);
   const update = useSceneStore((s) => s.updateShaderSource);
   const setCompatibility = useSceneStore((s) => s.updateShaderCompatibility);
+  const replaceFromExample = useSceneStore((s) => s.replaceFromExample);
   const diagnostics = useAppStore((s) => s.shaderDiagnostics);
   const fontSize = useAppStore((s) => s.editorFontSize);
   const zoomIn = useAppStore((s) => s.increaseEditorFontSize);
   const zoomOut = useAppStore((s) => s.decreaseEditorFontSize);
   const zoomReset = useAppStore((s) => s.resetEditorFontSize);
 
-  // Recompute the lint extension whenever the diagnostics list changes so
-  // CodeMirror re-renders the markers without us digging into the editor view.
   const lintExt = useMemo(
     () =>
       linter((view: EditorView): Diagnostic[] => {
@@ -51,9 +57,6 @@ export default function ShaderEditor() {
     [diagnostics],
   );
 
-  // Apply the current zoom level via a theme extension. CodeMirror's default
-  // theme hard-codes font-size on `.cm-content` and `.cm-gutters`; overriding
-  // both keeps the gutter and code in lockstep so line numbers don't drift.
   const fontSizeExt = useMemo(
     () =>
       EditorView.theme({
@@ -65,7 +68,78 @@ export default function ShaderEditor() {
 
   if (!file) return null;
   const source = file.scene.shader.source;
+  const currentCompat = file.scene.shader.compatibility;
   const errCount = diagnostics.length;
+
+  /// Switch the scene's shader compatibility. The behavior depends on what
+  /// the user currently has loaded:
+  ///   1. **Unedited example** (loadedExampleId set, dirty=false) → swap to
+  ///      the partner example in the new mode automatically. No prompt.
+  ///   2. **Unsaved edits** (dirty=true) → confirm before replacing. If the
+  ///      user accepts, drop into the default example for the new mode.
+  ///   3. **Saved file or empty scene** (dirty=false, no example) → drop
+  ///      into the default example for the new mode silently.
+  function switchCompatibility(target: ShaderCompatibility) {
+    if (target === currentCompat) return;
+
+    // Case 1: an example is loaded and untouched. Find the partner and load
+    // it directly — no question asked.
+    if (loadedExampleId && !dirty) {
+      const current = findExample(loadedExampleId);
+      if (current) {
+        const partner = findPartnerExample(current, target);
+        if (partner) {
+          loadExampleIntoScene(partner);
+          return;
+        }
+      }
+      // No partner exists (shouldn't happen for built-ins today); fall
+      // through to the default-example path.
+    }
+
+    // Case 2: unsaved edits — ask before clobbering.
+    if (dirty) {
+      const ok = window.confirm(
+        "You have unsaved changes to the shader. Switching compatibility " +
+          "will replace your code with the default example for " +
+          `${COMPATIBILITY_LABELS[target]}. Continue?\n\n` +
+          "Click Cancel to keep your changes and stay in the current mode " +
+          "(use Save first if you want to keep your work).",
+      );
+      if (!ok) return;
+    }
+
+    // Case 3 (and case 2 after confirmation): load the default example for
+    // the new mode. This always produces a compilable starting point so the
+    // user isn't staring at a "main function not found" error.
+    loadExampleIntoScene(defaultExampleFor(target));
+  }
+
+  function loadExampleIntoScene(ex: import("../examples").ExampleShader) {
+    if (!file) return;
+    const entryPoint =
+      ex.compatibility === "shadertoy-fragment-v1" ? "mainImage" : "main";
+    const next = {
+      ...file,
+      scene: {
+        ...file.scene,
+        shader: {
+          ...file.scene.shader,
+          source: ex.source,
+          entryPoint,
+          compatibility: ex.compatibility,
+        },
+      },
+    };
+    replaceFromExample(next, ex.id);
+  }
+
+  // Reference unused setters to avoid TS errors after the refactor — the
+  // switchCompatibility path supersedes direct setCompatibility/update
+  // calls from the picker, but tests and other callers might still want
+  // them exposed via the store.
+  void setCompatibility;
+  void update;
 
   return (
     <section className="panel editor-panel">
@@ -73,9 +147,9 @@ export default function ShaderEditor() {
         <span>Shader Editor — GLSL</span>
         <select
           className="compat-select"
-          value={file.scene.shader.compatibility}
+          value={currentCompat}
           onChange={(e) =>
-            setCompatibility(e.target.value as ShaderCompatibility)
+            switchCompatibility(e.target.value as ShaderCompatibility)
           }
           title="Compatibility mode — switches which entry point the prelude expects"
         >
@@ -113,7 +187,7 @@ export default function ShaderEditor() {
           theme="dark"
           basicSetup={{ lineNumbers: true, foldGutter: true, highlightActiveLine: true }}
           extensions={[cpp(), lintExt, fontSizeExt]}
-          onChange={(value) => update(value)}
+          onChange={(value) => useSceneStore.getState().updateShaderSource(value)}
         />
       </Suspense>
     </section>

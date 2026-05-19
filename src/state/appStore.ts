@@ -39,6 +39,10 @@ interface AppStore {
   renderQuality: number;
   /// Whether to render the FPS overlay on top of the render view.
   showFps: boolean;
+  /// Whether to draw the aspect-ratio frustum overlay rectangle on top of
+  /// the render. Persisted across sessions so a user who turns it off
+  /// doesn't have to keep toggling it on every scene load.
+  showFrustumOverlay: boolean;
   /// Font size used in the GLSL editor, in CSS pixels. Persisted via
   /// localStorage so it survives restarts.
   editorFontSize: number;
@@ -57,6 +61,8 @@ interface AppStore {
   setRenderQuality: (q: number) => void;
   setShowFps: (show: boolean) => void;
   toggleFps: () => void;
+  setShowFrustumOverlay: (show: boolean) => void;
+  toggleFrustumOverlay: () => void;
   setEditorFontSize: (size: number) => void;
   increaseEditorFontSize: () => void;
   decreaseEditorFontSize: () => void;
@@ -65,6 +71,7 @@ interface AppStore {
 }
 
 const SHOW_FPS_KEY = "luxel.showFps";
+const SHOW_FRUSTUM_KEY = "luxel.showFrustumOverlay";
 const EDITOR_FONT_KEY = "luxel.editorFontSize";
 export const EDITOR_FONT_DEFAULT = 13;
 export const EDITOR_FONT_MIN = 8;
@@ -151,6 +158,7 @@ export const useAppStore = create<AppStore>((set) => ({
   previewHeight: 0,
   renderQuality: 1.0,
   showFps: readStoredFlag(SHOW_FPS_KEY, false),
+  showFrustumOverlay: readStoredFlag(SHOW_FRUSTUM_KEY, false),
   editorFontSize: clampFont(readStoredNumber(EDITOR_FONT_KEY, EDITOR_FONT_DEFAULT)),
   renderTimestamps: [],
   setShaderStatus: (s) => set({ shaderStatus: s }),
@@ -184,6 +192,16 @@ export const useAppStore = create<AppStore>((set) => ({
       const next = !s.showFps;
       writeStoredFlag(SHOW_FPS_KEY, next);
       return { showFps: next };
+    }),
+  setShowFrustumOverlay: (show) => {
+    writeStoredFlag(SHOW_FRUSTUM_KEY, show);
+    set({ showFrustumOverlay: show });
+  },
+  toggleFrustumOverlay: () =>
+    set((s) => {
+      const next = !s.showFrustumOverlay;
+      writeStoredFlag(SHOW_FRUSTUM_KEY, next);
+      return { showFrustumOverlay: next };
     }),
   setEditorFontSize: (size) =>
     set(() => {

@@ -69,9 +69,8 @@ export default function Toolbar() {
   const dirty = useSceneStore((s) => s.dirty);
   const path = useSceneStore((s) => s.path);
   const replace = useSceneStore((s) => s.replace);
+  const replaceFromExample = useSceneStore((s) => s.replaceFromExample);
   const markSaved = useSceneStore((s) => s.markSaved);
-  const updateShaderSource = useSceneStore((s) => s.updateShaderSource);
-  const updateShaderCompatibility = useSceneStore((s) => s.updateShaderCompatibility);
 
   const renderQuality = useAppStore((s) => s.renderQuality);
   const setRenderQuality = useAppStore((s) => s.setRenderQuality);
@@ -229,12 +228,28 @@ export default function Toolbar() {
   }
 
   function loadExample(ex: ExampleShader) {
-    // Switch compatibility first so the entryPoint update lands before the
-    // new source — that way the editor never momentarily shows a `main()`
-    // function under `mainImage` mode (or vice versa).
-    const compat = ex.compatibility ?? "shadertoy-fragment-v1";
-    updateShaderCompatibility(compat);
-    updateShaderSource(ex.source);
+    // We need to capture the loaded example id atomically with the source
+    // change so the compatibility picker can recognize "the user is on an
+    // unedited example". Doing this through individual setters would race:
+    // the updateShaderSource action clears loadedExampleId, so we have to
+    // produce the new SceneFile directly and call replaceFromExample.
+    const current = useSceneStore.getState().file;
+    if (!current) return;
+    const entryPoint =
+      ex.compatibility === "shadertoy-fragment-v1" ? "mainImage" : "main";
+    const next = {
+      ...current,
+      scene: {
+        ...current.scene,
+        shader: {
+          ...current.scene.shader,
+          source: ex.source,
+          entryPoint,
+          compatibility: ex.compatibility,
+        },
+      },
+    };
+    replaceFromExample(next, ex.id);
     append({
       timestamp: new Date().toISOString(),
       level: "info",
@@ -332,10 +347,16 @@ export default function Toolbar() {
     }
   }
 
+  // Filter to only the examples that match the current scene's compatibility.
+  // The compatibility picker in the Shader Editor header is the way to flip
+  // modes — once flipped, the Examples dropdown shows the matched set for
+  // that mode and the old one disappears.
+  const currentCompat =
+    file?.scene.shader.compatibility ?? "raw-fragment-v1";
+  const visible = EXAMPLES.filter((e) => e.compatibility === currentCompat);
   const examplesByKind = {
-    "2D": EXAMPLES.filter((e) => e.kind === "2D"),
-    "3D": EXAMPLES.filter((e) => e.kind === "3D"),
-    Raw: EXAMPLES.filter((e) => e.kind === "Raw"),
+    "2D": visible.filter((e) => e.kind === "2D"),
+    "3D": visible.filter((e) => e.kind === "3D"),
   };
 
   return (
@@ -369,7 +390,11 @@ export default function Toolbar() {
         </button>
         {examplesOpen && (
           <div className="dropdown-menu">
-            <div className="dropdown-section">2D</div>
+            <div className="dropdown-section">
+              {currentCompat === "shadertoy-fragment-v1"
+                ? "2D · Shadertoy"
+                : "2D · Raw GLSL"}
+            </div>
             {examplesByKind["2D"].map((ex) => (
               <button
                 key={ex.id}
@@ -380,19 +405,12 @@ export default function Toolbar() {
                 {ex.name}
               </button>
             ))}
-            <div className="dropdown-section">3D</div>
+            <div className="dropdown-section">
+              {currentCompat === "shadertoy-fragment-v1"
+                ? "3D · Shadertoy"
+                : "3D · Raw GLSL"}
+            </div>
             {examplesByKind["3D"].map((ex) => (
-              <button
-                key={ex.id}
-                className="dropdown-item"
-                onClick={() => loadExample(ex)}
-                title={ex.description}
-              >
-                {ex.name}
-              </button>
-            ))}
-            <div className="dropdown-section">Raw GLSL</div>
-            {examplesByKind.Raw.map((ex) => (
               <button
                 key={ex.id}
                 className="dropdown-item"

@@ -40,6 +40,12 @@ fn default_scene_produces_pixels() {
 fn raymarch_scene_renders() {
     let Some(r) = try_renderer() else { return };
     let mut scene = Scene::default();
+    // The fixture is a Shadertoy-style `mainImage` shader. The default
+    // ShaderSource is now raw GLSL, so we have to flip compatibility back
+    // for this test to exercise the Shadertoy prelude path with the
+    // checked-in disk fixture.
+    scene.shader.compatibility = ShaderCompatibility::ShadertoyFragmentV1;
+    scene.shader.entry_point = "mainImage".to_string();
     scene.shader.source = include_str!("../../../examples/shaders/raymarch_sphere.glsl").to_string();
     scene.render_settings.width = 256;
     scene.render_settings.height = 256;

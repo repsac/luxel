@@ -110,8 +110,21 @@ mod tests {
     use super::*;
 
     #[test]
-    fn default_shader_compiles() {
-        let r = compile_default_compat(luxel_core::scene::DEFAULT_GLSL).unwrap();
+    fn default_scene_shader_compiles() {
+        // Whatever the default ShaderSource is (currently raw GLSL), it must
+        // round-trip through the prelude + naga + WGSL emitter cleanly. This
+        // is the regression guard if we ever flip the default again.
+        let r = compile_glsl_fragment(&ShaderSource::default()).unwrap();
+        assert!(r.ok);
+        assert!(r.wgsl.is_some());
+    }
+
+    #[test]
+    fn shadertoy_default_template_compiles() {
+        // The canonical Shadertoy template — what the editor's compatibility
+        // picker drops in when the user flips to Shadertoy mode — must also
+        // compile via the Shadertoy prelude path.
+        let r = compile_default_compat(luxel_core::scene::DEFAULT_GLSL_SHADERTOY).unwrap();
         assert!(r.ok);
         assert!(r.wgsl.is_some());
     }

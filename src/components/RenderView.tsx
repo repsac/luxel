@@ -27,6 +27,9 @@ export default function RenderView() {
   const lastRender = useAppStore((s) => s.lastRender);
   const setRenderCanvas = useAppStore((s) => s.setRenderCanvas);
   const setPreviewSize = useAppStore((s) => s.setPreviewSize);
+  // Frustum overlay flag is a global UI preference (localStorage-backed),
+  // not part of the scene — see AspectRatioControl for the toggle.
+  const showFrustum = useAppStore((s) => s.showFrustumOverlay);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const [wrapPx, setWrapPx] = useState({ w: 0, h: 0 });
@@ -100,7 +103,6 @@ export default function RenderView() {
     aspect && previewW > 0 && previewH > 0
       ? fitOverlay(previewW, previewH, aspect)
       : null;
-  const showFrustum = file.scene.renderSettings.showFrustumOverlay;
 
   function onPointerDown(e: React.PointerEvent) {
     (e.target as Element).setPointerCapture(e.pointerId);

@@ -113,7 +113,11 @@ impl Default for RenderSettings {
             width: 1280,
             height: 720,
             aspect_ratio: AspectRatio::default(),
-            show_frustum_overlay: true,
+            // Off by default — most of the time the user just wants to see
+            // the rendered image without the dashed guide rectangle. The
+            // toggle remains in AspectRatioControl; the frontend remembers
+            // the user's last choice via localStorage.
+            show_frustum_overlay: false,
         }
     }
 }
@@ -172,5 +176,28 @@ mod tests {
         assert_eq!(s, "\"21:9\"");
         let a: AspectRatio = serde_json::from_str(&s).unwrap();
         assert_eq!(a, AspectRatio::new(21, 9));
+    }
+
+    #[test]
+    fn default_frustum_overlay_is_off() {
+        // The frustum overlay defaults off so a fresh scene doesn't ship with
+        // a dashed rectangle drawn over the render. The user can opt in via
+        // the AspectRatioControl checkbox; that preference is persisted on
+        // the frontend side via localStorage.
+        let rs = RenderSettings::default();
+        assert!(
+            !rs.show_frustum_overlay,
+            "expected showFrustumOverlay = false by default"
+        );
+    }
+
+    #[test]
+    fn default_render_size_and_aspect_are_sane() {
+        // Lightweight regression guard so a stray default refactor can't
+        // ship a 0×0 render size or break the aspect default.
+        let rs = RenderSettings::default();
+        assert!(rs.width >= 16);
+        assert!(rs.height >= 16);
+        assert_eq!(rs.aspect_ratio, AspectRatio::new(16, 9));
     }
 }

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useSceneStore } from "../state/sceneStore";
+import { useAppStore } from "../state/appStore";
 import { parseAspect } from "./aspectMath";
 
 const PRESETS = ["1:1", "4:3", "16:9", "21:9"];
@@ -7,6 +8,11 @@ const PRESETS = ["1:1", "4:3", "16:9", "21:9"];
 export default function AspectRatioControl() {
   const file = useSceneStore((s) => s.file);
   const update = useSceneStore((s) => s.updateRenderSettings);
+  // Frustum overlay state is a global UI preference stored in localStorage,
+  // not a per-scene setting — flipping it once should stick across every
+  // scene the user opens.
+  const showFrustumOverlay = useAppStore((s) => s.showFrustumOverlay);
+  const setShowFrustumOverlay = useAppStore((s) => s.setShowFrustumOverlay);
   const current = file?.scene.renderSettings.aspectRatio ?? "16:9";
 
   // Custom input mirrors current ratio when it isn't a preset, so the user can
@@ -63,8 +69,8 @@ export default function AspectRatioControl() {
       <label className="toggle">
         <input
           type="checkbox"
-          checked={file.scene.renderSettings.showFrustumOverlay}
-          onChange={(e) => update({ showFrustumOverlay: e.target.checked })}
+          checked={showFrustumOverlay}
+          onChange={(e) => setShowFrustumOverlay(e.target.checked)}
         />
         Frustum
       </label>
