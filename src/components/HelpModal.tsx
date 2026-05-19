@@ -183,6 +183,23 @@ export default function HelpModal({ open, onClose }: Props) {
               Loading an example from the dropdown automatically switches to
               the compatibility mode it expects.
             </p>
+            <h3 className="hint-heading">GLSL dialect</h3>
+            <p className="hint">
+              Under the hood Luxel accepts <strong>GLSL 4.50 in the
+              Vulkan/SPIR-V dialect</strong> (via{" "}
+              <a href="https://github.com/gfx-rs/wgpu/tree/trunk/naga">naga</a>
+              ). naga's GLSL frontend doesn't accept{" "}
+              <code>#version 330</code> or older, so a "GLSL 3.3 mode" isn't
+              available as a separate picker option.
+            </p>
+            <p className="hint">
+              Porting 3.3 fragment-shader code: drop your{" "}
+              <code>#version</code> line at the top (the prelude provides
+              one), use Raw GLSL mode, and avoid 4.x-only features —{" "}
+              <code>imageLoad</code>/<code>Store</code>, SSBOs, atomic
+              counters, tessellation, and compute. For typical raymarchers
+              and effect shaders the body translates with zero edits.
+            </p>
           </section>
           <section>
             <h3>Shader uniforms</h3>
