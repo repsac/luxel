@@ -17,8 +17,15 @@ impl Default for ShaderLanguage {
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "kebab-case")]
 pub enum ShaderCompatibility {
+    /// Shadertoy convention: user writes `mainImage(out vec4, in vec2)` and
+    /// the prelude wraps it in a generated `void main()`.
     #[serde(rename = "shadertoy-fragment-v1")]
     ShadertoyFragmentV1,
+    /// Raw GLSL 450 fragment shader: user writes their own `void main()` and
+    /// writes to the prelude-provided `outColor`. Uniforms and the
+    /// `v_uv` input are still injected.
+    #[serde(rename = "raw-fragment-v1")]
+    RawFragmentV1,
 }
 
 impl Default for ShaderCompatibility {

@@ -5,7 +5,7 @@
 //! short-circuit with `eprintln!` rather than failing — that way a developer
 //! laptop run is meaningful but CI without a GPU isn't a false positive.
 
-use luxel_core::{Scene, SceneFile};
+use luxel_core::{Scene, SceneFile, ShaderCompatibility};
 use luxel_render::{GpuBackend, Renderer};
 
 fn try_renderer() -> Option<Renderer> {
@@ -79,4 +79,37 @@ fn scene_file_to_render_round_trip() {
     let parsed: SceneFile = serde_json::from_str(&json).unwrap();
     let result = r.render_single_frame(&parsed.scene).expect("render should succeed");
     assert!(result.pixel_bytes() > 0);
+}
+
+#[test]
+fn raw_glsl_scene_renders_a_gradient() {
+    let Some(r) = try_renderer() else { return };
+    let mut scene = Scene::default();
+    scene.shader.compatibility = ShaderCompatibility::RawFragmentV1;
+    scene.shader.entry_point = "main".to_string();
+    // A simple raw shader that writes v_uv into red/green so the corners differ.
+    scene.shader.source = "void main(){ outColor = vec4(v_uv.x, v_uv.y, 0.25, 1.0); }".to_string();
+    scene.render_settings.width = 64;
+    scene.render_settings.height = 64;
+    let result = r.render_single_frame(&scene).expect("raw glsl render");
+    let pixels = &result.pixels;
+    // Top-left of the canvas corresponds to NDC y=+1 → v_uv = (0, 1), so green
+    // should be high and red should be low. Bottom-right → v_uv ≈ (1, 0), so
+    // red high, green low.
+    let tl = &pixels[..4];
+    let stride = 64 * 4;
+    let br_offset = 63 * stride + 63 * 4;
+    let br = &pixels[br_offset..br_offset + 4];
+    assert!(
+        tl[1] > tl[0],
+        "top-left should be greener than red, got R={} G={}",
+        tl[0],
+        tl[1]
+    );
+    assert!(
+        br[0] > br[1],
+        "bottom-right should be redder than green, got R={} G={}",
+        br[0],
+        br[1]
+    );
 }

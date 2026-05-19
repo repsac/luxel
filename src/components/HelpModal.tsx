@@ -147,8 +147,46 @@ export default function HelpModal({ open, onClose }: Props) {
             </p>
           </section>
           <section>
+            <h3>Shader compatibility modes</h3>
+            <p>
+              The compatibility dropdown in the editor header picks how your
+              source is wrapped before going to the GPU:
+            </p>
+            <table>
+              <tbody>
+                <tr>
+                  <td>
+                    <strong>Shadertoy (mainImage)</strong>
+                  </td>
+                  <td>
+                    Write{" "}
+                    <code>void mainImage(out vec4 fragColor, in vec2 fragCoord)</code>
+                    . Luxel wraps it in a generated <code>main()</code> and
+                    handles the output binding for you. Best for porting
+                    shaders from shadertoy.com.
+                  </td>
+                </tr>
+                <tr>
+                  <td>
+                    <strong>Raw GLSL (main)</strong>
+                  </td>
+                  <td>
+                    Write your own <code>void main()</code> and assign to the
+                    prelude-provided <code>outColor</code>. <code>v_uv</code>
+                    {" "}([0,0] bottom-left to [1,1] top-right) and every
+                    uniform are still injected.
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+            <p className="hint">
+              Loading an example from the dropdown automatically switches to
+              the compatibility mode it expects.
+            </p>
+          </section>
+          <section>
             <h3>Shader uniforms</h3>
-            <p>Available in every Shadertoy-style fragment shader:</p>
+            <p>Available in both Shadertoy and raw modes:</p>
             <pre>
               {`vec3  iResolution        // viewport size in pixels (x, y, 1)
 float iTime              // currentFrame / targetFps
@@ -158,7 +196,11 @@ vec3  iCameraPosition    // world-space camera position
 float iCameraFov         // vertical, radians
 vec3  iCameraForward     // normalized
 vec3  iCameraRight       // normalized
-vec3  iCameraUp          // normalized`}
+vec3  iCameraUp          // normalized
+
+// Raw mode also exposes:
+in  vec2 v_uv;           // [0,0] bottom-left, [1,1] top-right
+out vec4 outColor;       // write your final color here`}
             </pre>
             <p className="hint">
               Standard 3D ray formula:

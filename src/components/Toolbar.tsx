@@ -71,6 +71,7 @@ export default function Toolbar() {
   const replace = useSceneStore((s) => s.replace);
   const markSaved = useSceneStore((s) => s.markSaved);
   const updateShaderSource = useSceneStore((s) => s.updateShaderSource);
+  const updateShaderCompatibility = useSceneStore((s) => s.updateShaderCompatibility);
 
   const renderQuality = useAppStore((s) => s.renderQuality);
   const setRenderQuality = useAppStore((s) => s.setRenderQuality);
@@ -228,6 +229,11 @@ export default function Toolbar() {
   }
 
   function loadExample(ex: ExampleShader) {
+    // Switch compatibility first so the entryPoint update lands before the
+    // new source — that way the editor never momentarily shows a `main()`
+    // function under `mainImage` mode (or vice versa).
+    const compat = ex.compatibility ?? "shadertoy-fragment-v1";
+    updateShaderCompatibility(compat);
     updateShaderSource(ex.source);
     append({
       timestamp: new Date().toISOString(),
@@ -329,6 +335,7 @@ export default function Toolbar() {
   const examplesByKind = {
     "2D": EXAMPLES.filter((e) => e.kind === "2D"),
     "3D": EXAMPLES.filter((e) => e.kind === "3D"),
+    Raw: EXAMPLES.filter((e) => e.kind === "Raw"),
   };
 
   return (
@@ -375,6 +382,17 @@ export default function Toolbar() {
             ))}
             <div className="dropdown-section">3D</div>
             {examplesByKind["3D"].map((ex) => (
+              <button
+                key={ex.id}
+                className="dropdown-item"
+                onClick={() => loadExample(ex)}
+                title={ex.description}
+              >
+                {ex.name}
+              </button>
+            ))}
+            <div className="dropdown-section">Raw GLSL</div>
+            {examplesByKind.Raw.map((ex) => (
               <button
                 key={ex.id}
                 className="dropdown-item"

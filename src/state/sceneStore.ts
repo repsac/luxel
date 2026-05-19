@@ -63,11 +63,15 @@ export interface CameraBookmark {
   fovYDegrees: number;
 }
 
+export type ShaderCompatibility =
+  | "shadertoy-fragment-v1"
+  | "raw-fragment-v1";
+
 export interface ShaderSource {
   language: "glsl";
   source: string;
   entryPoint: string;
-  compatibility: "shadertoy-fragment-v1";
+  compatibility: ShaderCompatibility;
 }
 
 export interface RenderSettings {
@@ -100,6 +104,7 @@ interface SceneStore {
   path: string | null;
   replace: (file: SceneFile) => void;
   updateShaderSource: (source: string) => void;
+  updateShaderCompatibility: (compat: ShaderCompatibility) => void;
   updateRenderSettings: (patch: Partial<RenderSettings>) => void;
   setCamera: (camera: CameraState) => void;
   addBookmark: (b: CameraBookmark) => void;
@@ -140,6 +145,29 @@ export const useSceneStore = create<SceneStore>((set) => ({
           }
         : s,
     ),
+  updateShaderCompatibility: (compat) =>
+    set((s) => {
+      if (!s.file) return s;
+      // Update entryPoint to the canonical name for the chosen mode so the
+      // scene file documents the real entry — Shadertoy => mainImage, raw =>
+      // main. The user can still override later, but the default is correct.
+      const entryPoint =
+        compat === "shadertoy-fragment-v1" ? "mainImage" : "main";
+      return {
+        file: {
+          ...s.file,
+          scene: {
+            ...s.file.scene,
+            shader: {
+              ...s.file.scene.shader,
+              compatibility: compat,
+              entryPoint,
+            },
+          },
+        },
+        dirty: true,
+      };
+    }),
   updateRenderSettings: (patch) =>
     set((s) =>
       s.file

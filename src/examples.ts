@@ -18,7 +18,9 @@
 //   float h = tan(iCameraFov * 0.5);
 //   vec3 rd = normalize(iCameraForward + uv.x * h * iCameraRight + uv.y * h * iCameraUp);
 
-export type ExampleKind = "2D" | "3D";
+import type { ShaderCompatibility } from "./state/sceneStore";
+
+export type ExampleKind = "2D" | "3D" | "Raw";
 
 export interface ExampleShader {
   id: string;
@@ -26,6 +28,10 @@ export interface ExampleShader {
   name: string;
   description: string;
   source: string;
+  /// Which shader compatibility profile this example expects. Defaults to
+  /// Shadertoy convention (the `mainImage` examples); the `Raw` examples
+  /// override to `raw-fragment-v1`.
+  compatibility?: ShaderCompatibility;
 }
 
 const gradient: ExampleShader = {
@@ -337,6 +343,47 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord)
 `,
 };
 
+// ---------------- Raw GLSL examples ----------------
+//
+// These use the `raw-fragment-v1` compatibility mode: the user owns `main()`
+// and writes to the prelude-provided `outColor`. `v_uv` is supplied; uniforms
+// are identical to Shadertoy mode.
+
+const rawHello: ExampleShader = {
+  id: "raw-hello",
+  kind: "Raw",
+  name: "Hello (raw)",
+  description: "Minimal raw GLSL shader: write v_uv to red/green.",
+  compatibility: "raw-fragment-v1",
+  source: `// Raw GLSL — you own main(). The prelude supplies:
+//   in  vec2 v_uv;        // [0,0] bottom-left, [1,1] top-right
+//   out vec4 outColor;
+//   + every uniform (iResolution, iTime, iCameraPosition, …)
+
+void main() {
+    outColor = vec4(v_uv, 0.5 + 0.5 * sin(iTime), 1.0);
+}
+`,
+};
+
+const rawRipple: ExampleShader = {
+  id: "raw-ripple",
+  kind: "Raw",
+  name: "Ripple (raw)",
+  description: "Time-driven radial ripple, written as a standard GLSL main().",
+  compatibility: "raw-fragment-v1",
+  source: `void main() {
+    vec2 uv = v_uv - 0.5;
+    uv.x *= iResolution.x / iResolution.y;
+    float r = length(uv);
+    float w = sin(r * 30.0 - iTime * 4.0) * 0.5 + 0.5;
+    vec3 base = mix(vec3(0.05, 0.12, 0.25), vec3(0.85, 0.65, 0.3), w);
+    float vignette = smoothstep(0.7, 0.2, r);
+    outColor = vec4(base * vignette, 1.0);
+}
+`,
+};
+
 export const EXAMPLES: ExampleShader[] = [
   gradient,
   plasma,
@@ -346,6 +393,8 @@ export const EXAMPLES: ExampleShader[] = [
   torus3d,
   ground3d,
   fractal3d,
+  rawHello,
+  rawRipple,
 ];
 
 export function findExample(id: string): ExampleShader | undefined {

@@ -124,6 +124,34 @@ mod tests {
     }
 
     #[test]
+    fn raw_glsl_main_compiles() {
+        // The user owns `main()` in raw mode; the prelude only supplies
+        // uniforms, the v_uv input, and the outColor output.
+        let src = ShaderSource {
+            language: luxel_core::ShaderLanguage::Glsl,
+            source: "void main(){ outColor = vec4(v_uv, 0.5 + 0.5 * sin(iTime), 1.0); }"
+                .to_string(),
+            entry_point: "main".to_string(),
+            compatibility: ShaderCompatibility::RawFragmentV1,
+        };
+        let r = compile_glsl_fragment(&src).expect("raw main shader should compile");
+        assert!(r.ok);
+        assert!(r.wgsl.is_some());
+    }
+
+    #[test]
+    fn raw_glsl_syntax_error_returns_diagnostic() {
+        let src = ShaderSource {
+            language: luxel_core::ShaderLanguage::Glsl,
+            source: "void main(){ this is not valid glsl }".to_string(),
+            entry_point: "main".to_string(),
+            compatibility: ShaderCompatibility::RawFragmentV1,
+        };
+        let err = compile_glsl_fragment(&src).expect_err("syntax error expected");
+        assert!(!err.diagnostics.is_empty());
+    }
+
+    #[test]
     fn user_source_is_not_mutated() {
         let src = ShaderSource::default();
         let original = src.source.clone();

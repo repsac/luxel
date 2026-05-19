@@ -2,8 +2,13 @@ import { lazy, Suspense, useMemo } from "react";
 import { cpp } from "@codemirror/lang-cpp";
 import { linter, type Diagnostic } from "@codemirror/lint";
 import { EditorView } from "@codemirror/view";
-import { useSceneStore } from "../state/sceneStore";
+import { useSceneStore, type ShaderCompatibility } from "../state/sceneStore";
 import { useAppStore } from "../state/appStore";
+
+const COMPATIBILITY_LABELS: Record<ShaderCompatibility, string> = {
+  "shadertoy-fragment-v1": "Shadertoy (mainImage)",
+  "raw-fragment-v1": "Raw GLSL (main)",
+};
 import {
   MagnifierMinus,
   MagnifierPlus,
@@ -15,6 +20,7 @@ const CodeMirror = lazy(() => import("@uiw/react-codemirror"));
 export default function ShaderEditor() {
   const file = useSceneStore((s) => s.file);
   const update = useSceneStore((s) => s.updateShaderSource);
+  const setCompatibility = useSceneStore((s) => s.updateShaderCompatibility);
   const diagnostics = useAppStore((s) => s.shaderDiagnostics);
   const fontSize = useAppStore((s) => s.editorFontSize);
   const zoomIn = useAppStore((s) => s.increaseEditorFontSize);
@@ -65,7 +71,20 @@ export default function ShaderEditor() {
     <section className="panel editor-panel">
       <header>
         <span>Shader Editor — GLSL</span>
-        <span className="meta">{file.scene.shader.compatibility}</span>
+        <select
+          className="compat-select"
+          value={file.scene.shader.compatibility}
+          onChange={(e) =>
+            setCompatibility(e.target.value as ShaderCompatibility)
+          }
+          title="Compatibility mode — switches which entry point the prelude expects"
+        >
+          {(Object.keys(COMPATIBILITY_LABELS) as ShaderCompatibility[]).map((id) => (
+            <option key={id} value={id}>
+              {COMPATIBILITY_LABELS[id]}
+            </option>
+          ))}
+        </select>
         <div className="zoom-controls">
           <button onClick={zoomOut} title="Zoom out (Cmd/Ctrl −)" aria-label="Zoom out">
             <MagnifierMinus />
