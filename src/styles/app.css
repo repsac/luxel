@@ -474,19 +474,68 @@ button.primary:hover { background: #3580f0; }
 }
 .playback-bar .playhead-readout {
   display: inline-flex;
-  align-items: baseline;
+  align-items: center;
   gap: 4px;
   font-family: ui-monospace, "JetBrains Mono", Menlo, monospace;
   font-variant-numeric: tabular-nums;
   color: #c3cdd9;
-  min-width: 130px;
+  min-width: 170px;
 }
-.playback-bar .frame-cur { color: #7ad3ff; }
 .playback-bar .frame-sep,
 .playback-bar .frame-end { color: #5d6a78; }
-.playback-bar .frame-time {
-  margin-left: 6px;
+
+/// Editable readouts: visually flush — no surrounding box — so they feel
+/// like the static labels they replaced, but reveal an outline on hover or
+/// focus to advertise that they're inputs. Number-spinner arrows are
+/// suppressed to keep the strip tight.
+.playback-bar .readout-cell {
+  display: inline-flex;
+  align-items: baseline;
+}
+.playback-bar .readout-cell input[type="number"] {
+  background: transparent;
+  border: 1px solid transparent;
+  color: inherit;
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+  padding: 0 2px;
+  margin: 0;
+  border-radius: 3px;
+  /* Default width — the per-input class below tightens these for the frame
+     vs the seconds value, both of which have predictable digit counts. */
+  width: 4em;
+  text-align: right;
+}
+.playback-bar .readout-cell input[type="number"]:hover {
+  border-color: #2a3645;
+}
+.playback-bar .readout-cell input[type="number"]:focus {
+  outline: none;
+  border-color: #3a82f5;
+  background: #11161e;
+}
+/* Suppress the spinner arrows; they're noisy at this size. */
+.playback-bar .readout-cell input[type="number"]::-webkit-outer-spin-button,
+.playback-bar .readout-cell input[type="number"]::-webkit-inner-spin-button {
+  appearance: none;
+  margin: 0;
+}
+.playback-bar .readout-cell input[type="number"] {
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+.playback-bar .frame-cur-input {
+  color: #7ad3ff;
+  width: 4em;
+}
+.playback-bar .frame-time-input {
   color: #6b7886;
+  width: 4.5em;
+  margin-left: 6px;
+}
+.playback-bar .readout-suffix {
+  color: #6b7886;
+  margin-left: 1px;
 }
 .playback-bar .frame-range {
   display: inline-flex;
