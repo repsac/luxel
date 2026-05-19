@@ -484,10 +484,10 @@ button.primary:hover { background: #3580f0; }
 .playback-bar .frame-sep,
 .playback-bar .frame-end { color: #5d6a78; }
 
-/// Editable readouts: visually flush — no surrounding box — so they feel
-/// like the static labels they replaced, but reveal an outline on hover or
-/// focus to advertise that they're inputs. Number-spinner arrows are
-/// suppressed to keep the strip tight.
+/* Editable readouts: visually flush — no surrounding box — so they feel
+   like the static labels they replaced, but reveal an outline on hover or
+   focus to advertise that they're inputs. Number-spinner arrows are
+   suppressed to keep the strip tight. */
 .playback-bar .readout-cell {
   display: inline-flex;
   align-items: baseline;
