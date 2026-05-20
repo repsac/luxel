@@ -147,6 +147,10 @@ The release build is typically 5–10× faster than the dev build for shader-hea
 - Use **Save** to write the current scene; an unsaved scene prompts for a path.
 - Scenes embed: GLSL source, render settings (resolution, aspect ratio, overlay), camera state, camera bookmarks, and panel layout.
 
+## Window state
+
+Luxel remembers its window size, position, and maximized/fullscreen state between launches via [`tauri-plugin-window-state`](https://github.com/tauri-apps/plugins-workspace/tree/v2/plugins/window-state). State is written on exit and restored on startup; no per-scene configuration is involved. To reset to defaults, delete the plugin's state file (`.window-state.json` under the app's data directory).
+
 ## Known limitations (v1)
 
 - Single-frame rendering only (no animation loop).

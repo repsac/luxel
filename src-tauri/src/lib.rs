@@ -19,6 +19,10 @@ pub fn run() {
     tracing::info!("starting Luxel v{}", env!("CARGO_PKG_VERSION"));
 
     tauri::Builder::default()
+        // Persist + restore window size, position, and maximized/fullscreen
+        // state across launches. The plugin auto-restores config-defined
+        // windows on startup and auto-saves on exit; no JS wiring needed.
+        .plugin(tauri_plugin_window_state::Builder::default().build())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_shell::init())
