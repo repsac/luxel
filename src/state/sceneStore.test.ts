@@ -37,6 +37,7 @@ function makeFile(overrides: Partial<SceneFile["scene"]> = {}): SceneFile {
         currentFrame: 0,
         targetFps: 60,
       },
+      object: { position: [0, 0, 0] },
       ...overrides,
     },
   };
@@ -108,5 +109,13 @@ describe("sceneStore example tracking", () => {
     const s = useSceneStore.getState().file!.scene.shader;
     expect(s.compatibility).toBe("shadertoy-fragment-v1");
     expect(s.entryPoint).toBe("mainImage");
+  });
+
+  it("setObjectPosition updates the object transform and dirties the scene", () => {
+    useSceneStore.getState().replace(makeFile());
+    useSceneStore.getState().setObjectPosition([1.5, -2, 3]);
+    const s = useSceneStore.getState();
+    expect(s.file?.scene.object.position).toEqual([1.5, -2, 3]);
+    expect(s.dirty).toBe(true);
   });
 });

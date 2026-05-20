@@ -5,6 +5,7 @@ import { useConsoleStore } from "../state/consoleStore";
 import { invoke } from "../tauri/commands";
 import { exportCanvasAsPng, renderScene } from "../actions/render";
 import { EXAMPLES, type ExampleShader } from "../examples";
+import { GIZMO_POC_ENABLED } from "../featureFlags";
 import LayoutMenu from "./LayoutMenu";
 import { HelpButton } from "./HelpModal";
 import {
@@ -353,7 +354,11 @@ export default function Toolbar() {
   // that mode and the old one disappears.
   const currentCompat =
     file?.scene.shader.compatibility ?? "raw-fragment-v1";
-  const visible = EXAMPLES.filter((e) => e.compatibility === currentCompat);
+  const visible = EXAMPLES.filter(
+    (e) =>
+      e.compatibility === currentCompat &&
+      (GIZMO_POC_ENABLED || !e.experimental),
+  );
   const examplesByKind = {
     "2D": visible.filter((e) => e.kind === "2D"),
     "3D": visible.filter((e) => e.kind === "3D"),

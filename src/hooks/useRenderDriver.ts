@@ -18,6 +18,7 @@ export function useRenderDriver(): void {
   const file = useSceneStore((s) => s.file);
   const camera = file?.scene.camera;
   const shaderSource = file?.scene.shader.source;
+  const objectPosition = file?.scene.object.position;
   const currentFrame = file?.scene.timeline.currentFrame;
   const targetFps = file?.scene.timeline.targetFps;
   const previewWidth = useAppStore((s) => s.previewWidth);
@@ -37,6 +38,7 @@ export function useRenderDriver(): void {
   }, [
     camera,
     shaderSource,
+    objectPosition,
     currentFrame,
     targetFps,
     previewWidth,

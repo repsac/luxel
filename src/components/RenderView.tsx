@@ -2,11 +2,18 @@ import { useEffect, useRef, useState } from "react";
 import { useAppStore } from "../state/appStore";
 import { useSceneStore } from "../state/sceneStore";
 import { fitOverlay, parseAspect } from "./aspectMath";
+import { computeGizmo, dragDelta, pickAxis } from "./gizmoMath";
+import { GIZMO_POC_ENABLED } from "../featureFlags";
 import AspectRatioControl from "./AspectRatioControl";
 import CameraBookmarks from "./CameraBookmarks";
 import FpsOverlay from "./FpsOverlay";
 
 type V3 = [number, number, number];
+
+/// Move-gizmo constants.
+const GIZMO_HANDLE_PX = 64; // axis handle length on screen
+const GIZMO_HIT_PX = 9; // pointer pick tolerance from an axis line
+const AXIS_COLORS = ["#ff5d5d", "#5dff86", "#5da8ff"]; // X, Y, Z
 
 const DEFAULT_CAMERA = {
   position: [0, 0, 5] as V3,
@@ -24,18 +31,24 @@ const MAX_PREVIEW_DIM = 2048;
 export default function RenderView() {
   const file = useSceneStore((s) => s.file);
   const setCamera = useSceneStore((s) => s.setCamera);
+  const setObjectPosition = useSceneStore((s) => s.setObjectPosition);
   const lastRender = useAppStore((s) => s.lastRender);
   const setRenderCanvas = useAppStore((s) => s.setRenderCanvas);
   const setPreviewSize = useAppStore((s) => s.setPreviewSize);
   // Frustum overlay flag is a global UI preference (localStorage-backed),
   // not part of the scene — see AspectRatioControl for the toggle.
   const showFrustum = useAppStore((s) => s.showFrustumOverlay);
+  const gizmoEnabled = useAppStore((s) => s.gizmoEnabled);
+  const toggleGizmo = useAppStore((s) => s.toggleGizmo);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const [wrapPx, setWrapPx] = useState({ w: 0, h: 0 });
   const dragRef = useRef<{ x: number; y: number; button: number; shift: boolean } | null>(
     null,
   );
+  // Active gizmo drag: which axis (0=X,1=Y,2=Z) and the last client position.
+  const gizmoDragRef = useRef<{ axis: number; x: number; y: number } | null>(null);
+  const [activeAxis, setActiveAxis] = useState<number | null>(null);
 
   // Track the wrap div's pixel dimensions and feed them into appStore. The
   // auto-render hook then picks up the change and re-renders at the new size.
@@ -104,7 +117,33 @@ export default function RenderView() {
       ? fitOverlay(previewW, previewH, aspect)
       : null;
 
+  // Gizmo geometry is computed in CSS-pixel (wrap) space so it lines up 1:1
+  // with pointer events and the overlay's viewBox. The render fills the wrap
+  // at the same aspect ratio, so projecting against wrapPx matches what's on
+  // screen even when renderQuality < 1.
+  const objPos = file.scene.object.position;
+  const gizmo =
+    GIZMO_POC_ENABLED && gizmoEnabled && wrapPx.w > 0 && wrapPx.h > 0
+      ? computeGizmo(objPos, camera, wrapPx.w, wrapPx.h, GIZMO_HANDLE_PX)
+      : null;
+
+  function localXY(e: React.PointerEvent): { x: number; y: number } {
+    const rect = wrapRef.current?.getBoundingClientRect();
+    return { x: e.clientX - (rect?.left ?? 0), y: e.clientY - (rect?.top ?? 0) };
+  }
+
   function onPointerDown(e: React.PointerEvent) {
+    // Gizmo grabs the pointer before camera controls if a handle is hit.
+    if (gizmo && gizmo.origin.visible && e.button === 0) {
+      const { x, y } = localXY(e);
+      const axis = pickAxis(gizmo, x, y, GIZMO_HIT_PX);
+      if (axis >= 0) {
+        (e.target as Element).setPointerCapture(e.pointerId);
+        gizmoDragRef.current = { axis, x: e.clientX, y: e.clientY };
+        setActiveAxis(axis);
+        return;
+      }
+    }
     (e.target as Element).setPointerCapture(e.pointerId);
     dragRef.current = {
       x: e.clientX,
@@ -114,7 +153,22 @@ export default function RenderView() {
     };
   }
   function onPointerMove(e: React.PointerEvent) {
-    if (!dragRef.current || !file) return;
+    if (!file) return;
+
+    // Gizmo drag takes priority while active.
+    const gd = gizmoDragRef.current;
+    if (gd && gizmo) {
+      const dx = e.clientX - gd.x;
+      const dy = e.clientY - gd.y;
+      gd.x = e.clientX;
+      gd.y = e.clientY;
+      const delta = dragDelta(gizmo.axes[gd.axis], dx, dy);
+      const cur = file.scene.object.position;
+      setObjectPosition([cur[0] + delta[0], cur[1] + delta[1], cur[2] + delta[2]]);
+      return;
+    }
+
+    if (!dragRef.current) return;
     const dx = e.clientX - dragRef.current.x;
     const dy = e.clientY - dragRef.current.y;
     dragRef.current.x = e.clientX;
@@ -139,6 +193,10 @@ export default function RenderView() {
   }
   function onPointerUp() {
     dragRef.current = null;
+    if (gizmoDragRef.current) {
+      gizmoDragRef.current = null;
+      setActiveAxis(null);
+    }
   }
   function onWheel(e: React.WheelEvent) {
     if (!file) return;
@@ -167,10 +225,24 @@ export default function RenderView() {
         <button onClick={resetCamera} title="Reset camera (F)">
           Reset cam
         </button>
+        {GIZMO_POC_ENABLED && (
+          <button
+            onClick={toggleGizmo}
+            className={gizmoEnabled ? "primary" : ""}
+            title="Toggle the move gizmo — drag the X/Y/Z handles to move the object (iObjectPosition)"
+          >
+            Move
+          </button>
+        )}
         <CameraBookmarks />
         <span className="meta cam-pos" title="Camera position">
           [{posStr}]
         </span>
+        {gizmoEnabled && (
+          <span className="meta obj-pos" title="Object position (iObjectPosition)">
+            obj [{objPos.map((n) => n.toFixed(2)).join(", ")}]
+          </span>
+        )}
       </header>
       <div
         ref={wrapRef}
@@ -198,6 +270,45 @@ export default function RenderView() {
               strokeDasharray="6 4"
               strokeWidth={1.5}
               vectorEffect="non-scaling-stroke"
+            />
+          </svg>
+        )}
+        {gizmo && gizmo.origin.visible && (
+          <svg
+            className="gizmo-overlay"
+            viewBox={`0 0 ${wrapPx.w} ${wrapPx.h}`}
+            preserveAspectRatio="none"
+          >
+            {gizmo.axes.map((a, i) => {
+              const active = activeAxis === i;
+              return (
+                <g key={i}>
+                  <line
+                    x1={gizmo.origin.x}
+                    y1={gizmo.origin.y}
+                    x2={a.tipX}
+                    y2={a.tipY}
+                    stroke={AXIS_COLORS[i]}
+                    strokeWidth={active ? 3.5 : 2}
+                    strokeLinecap="round"
+                    vectorEffect="non-scaling-stroke"
+                  />
+                  <circle
+                    cx={a.tipX}
+                    cy={a.tipY}
+                    r={active ? 6 : 4.5}
+                    fill={AXIS_COLORS[i]}
+                  />
+                </g>
+              );
+            })}
+            <circle
+              cx={gizmo.origin.x}
+              cy={gizmo.origin.y}
+              r={3.5}
+              fill="#ffffff"
+              stroke="#0c1015"
+              strokeWidth={1}
             />
           </svg>
         )}

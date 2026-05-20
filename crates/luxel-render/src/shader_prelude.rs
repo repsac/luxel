@@ -53,8 +53,8 @@ pub fn wrap_raw_fragment(user_source: &str) -> String {
 /// Number of source lines the prelude takes up for a given compatibility
 /// profile. Used to map naga error line numbers back to the user's editor
 /// coordinates. Keep these constants in sync with the actual prelude strings.
-pub const SHADERTOY_PRELUDE_LINE_COUNT: u32 = 20;
-pub const RAW_PRELUDE_LINE_COUNT: u32 = 20;
+pub const SHADERTOY_PRELUDE_LINE_COUNT: u32 = 23;
+pub const RAW_PRELUDE_LINE_COUNT: u32 = 23;
 
 /// Lines consumed by the prelude (including the trailing
 /// `// ---- user shader ----` marker line). Used by the shader compiler to
@@ -88,6 +88,9 @@ layout(set = 0, binding = 0) uniform LuxelUniforms {
     vec3 iCameraForward;
     vec3 iCameraRight;
     vec3 iCameraUp;
+    // POC move gizmo. Subtract from your SDF sample point to place an object:
+    //   float d = sphereSdf(p - iObjectPosition, 1.0);
+    vec3 iObjectPosition;
 };
 
 layout(location = 0) in vec2 v_uv;
@@ -124,6 +127,9 @@ layout(set = 0, binding = 0) uniform LuxelUniforms {
     vec3 iCameraForward;
     vec3 iCameraRight;
     vec3 iCameraUp;
+    // POC move gizmo. Subtract from your SDF sample point to place an object:
+    //   float d = sphereSdf(p - iObjectPosition, 1.0);
+    vec3 iObjectPosition;
 };
 
 layout(location = 0) in vec2 v_uv;
@@ -184,6 +190,7 @@ mod tests {
                 "iCameraForward",
                 "iCameraRight",
                 "iCameraUp",
+                "iObjectPosition",
             ] {
                 assert!(wrapped.contains(u), "{compat:?} prelude missing {u}");
             }

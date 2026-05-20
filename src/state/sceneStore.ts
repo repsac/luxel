@@ -82,6 +82,10 @@ export interface RenderSettings {
   showFrustumOverlay: boolean;
 }
 
+export interface ObjectTransform {
+  position: [number, number, number];
+}
+
 export interface Scene {
   name: string;
   shader: ShaderSource;
@@ -90,6 +94,8 @@ export interface Scene {
   cameraBookmarks: CameraBookmark[];
   layout: LayoutState;
   timeline: TimelineState;
+  /// POC move-gizmo object transform, exposed to shaders as iObjectPosition.
+  object: ObjectTransform;
 }
 
 export interface SceneFile {
@@ -123,6 +129,7 @@ interface SceneStore {
   setMaximized: (slotIndex: number | null) => void;
   setTimeline: (patch: Partial<TimelineState>) => void;
   setCurrentFrame: (frame: number) => void;
+  setObjectPosition: (position: [number, number, number]) => void;
   markSaved: (path: string) => void;
 }
 
@@ -315,6 +322,18 @@ export const useSceneStore = create<SceneStore>((set) => ({
         },
       };
     }),
+  setObjectPosition: (position) =>
+    set((s) =>
+      s.file
+        ? {
+            file: {
+              ...s.file,
+              scene: { ...s.file.scene, object: { position } },
+            },
+            dirty: true,
+          }
+        : s,
+    ),
   markSaved: (path) =>
     // Saving to a real file means the user has adopted the content as their
     // own work; it's no longer "an unmodified example".

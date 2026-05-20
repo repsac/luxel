@@ -342,6 +342,16 @@ button.primary:hover { background: #3580f0; }
   pointer-events: none;
 }
 
+.gizmo-overlay {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  /* The wrap div owns pointer events (camera + gizmo drag); the SVG is purely
+     visual so it must not intercept them. */
+  pointer-events: none;
+}
+
 .fps-overlay {
   position: absolute;
   top: 8px;
@@ -608,6 +618,12 @@ button.primary:hover { background: #3580f0; }
   font-family: ui-monospace, "JetBrains Mono", Menlo, monospace;
   font-size: 11px;
   margin-left: 4px;
+}
+.obj-pos {
+  font-family: ui-monospace, "JetBrains Mono", Menlo, monospace;
+  font-size: 11px;
+  margin-left: 4px;
+  color: #d8a657;
 }
 .bookmark-row {
   display: flex;

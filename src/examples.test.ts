@@ -48,6 +48,23 @@ describe("EXAMPLES library", () => {
     }
   });
 
+  it("gizmo-demo pair is flagged experimental (hidden behind the feature flag)", () => {
+    // The move-gizmo POC is parked behind GIZMO_POC_ENABLED. Both halves of
+    // the demo pair must stay flagged so the Toolbar keeps them out of the
+    // dropdown; un-flagging here would silently re-expose the feature.
+    const demos = EXAMPLES.filter((e) => e.pairId === "gizmo-demo");
+    expect(demos).toHaveLength(2);
+    for (const d of demos) {
+      expect(d.experimental, `${d.id} should be experimental`).toBe(true);
+    }
+  });
+
+  it("only the gizmo-demo pair is experimental today", () => {
+    // Sanity guard: nothing else should accidentally pick up the flag.
+    const experimental = EXAMPLES.filter((e) => e.experimental);
+    expect(experimental.every((e) => e.pairId === "gizmo-demo")).toBe(true);
+  });
+
   it("Shadertoy examples reference mainImage, raw examples reference outColor + main()", () => {
     for (const ex of EXAMPLES) {
       if (ex.compatibility === "shadertoy-fragment-v1") {

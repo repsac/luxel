@@ -70,7 +70,9 @@ struct CachedTargets {
 ///  92:  pad
 ///  96:  vec3 iCameraUp
 /// 108:  pad
-/// 112: end
+/// 112:  vec3 iObjectPosition
+/// 124:  pad
+/// 128: end
 /// ```
 #[repr(C)]
 #[derive(Copy, Clone, Debug, Pod, Zeroable)]
@@ -88,6 +90,8 @@ struct ShaderUniforms {
     _pad2: f32,
     i_camera_up: [f32; 3],
     _pad3: f32,
+    i_object_position: [f32; 3],
+    _pad4: f32,
 }
 
 const COPY_ROW_ALIGN: u32 = wgpu::COPY_BYTES_PER_ROW_ALIGNMENT;
@@ -191,6 +195,8 @@ impl Renderer {
             _pad2: 0.0,
             i_camera_up: basis.up,
             _pad3: 0.0,
+            i_object_position: scene.object.position,
+            _pad4: 0.0,
         };
         let ubuf = self
             .device

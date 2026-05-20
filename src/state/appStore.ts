@@ -43,6 +43,10 @@ interface AppStore {
   /// the render. Persisted across sessions so a user who turns it off
   /// doesn't have to keep toggling it on every scene load.
   showFrustumOverlay: boolean;
+  /// Whether the move gizmo is active in the render view. When on, dragging
+  /// an axis handle moves the object (iObjectPosition) instead of orbiting
+  /// the camera. POC-grade; not persisted.
+  gizmoEnabled: boolean;
   /// Font size used in the GLSL editor, in CSS pixels. Persisted via
   /// localStorage so it survives restarts.
   editorFontSize: number;
@@ -63,6 +67,8 @@ interface AppStore {
   toggleFps: () => void;
   setShowFrustumOverlay: (show: boolean) => void;
   toggleFrustumOverlay: () => void;
+  setGizmoEnabled: (on: boolean) => void;
+  toggleGizmo: () => void;
   setEditorFontSize: (size: number) => void;
   increaseEditorFontSize: () => void;
   decreaseEditorFontSize: () => void;
@@ -159,6 +165,7 @@ export const useAppStore = create<AppStore>((set) => ({
   renderQuality: 1.0,
   showFps: readStoredFlag(SHOW_FPS_KEY, false),
   showFrustumOverlay: readStoredFlag(SHOW_FRUSTUM_KEY, false),
+  gizmoEnabled: false,
   editorFontSize: clampFont(readStoredNumber(EDITOR_FONT_KEY, EDITOR_FONT_DEFAULT)),
   renderTimestamps: [],
   setShaderStatus: (s) => set({ shaderStatus: s }),
@@ -203,6 +210,8 @@ export const useAppStore = create<AppStore>((set) => ({
       writeStoredFlag(SHOW_FRUSTUM_KEY, next);
       return { showFrustumOverlay: next };
     }),
+  setGizmoEnabled: (on) => set({ gizmoEnabled: on }),
+  toggleGizmo: () => set((s) => ({ gizmoEnabled: !s.gizmoEnabled })),
   setEditorFontSize: (size) =>
     set(() => {
       const next = clampFont(size);

@@ -13,7 +13,9 @@ pub use camera::{CameraError, CameraState};
 pub use layout::{
     LayoutShape, LayoutSizes, LayoutState, PanelState, SlotState, ViewId,
 };
-pub use scene::{Scene, SceneFile, ShaderCompatibility, ShaderLanguage, ShaderSource};
+pub use scene::{
+    ObjectTransform, Scene, SceneFile, ShaderCompatibility, ShaderLanguage, ShaderSource,
+};
 pub use settings::{AspectRatio, AspectRatioError, RenderMode, RenderSettings};
 pub use timeline::{TimelineError, TimelineState};
 pub use validation::{validate_scene, ValidationError};

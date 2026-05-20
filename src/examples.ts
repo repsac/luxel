@@ -39,6 +39,9 @@ export interface ExampleShader {
   name: string;
   description: string;
   source: string;
+  /// Hidden from the Examples dropdown unless its feature flag is on. Kept in
+  /// EXAMPLES (so pairing/lookup still works) but not surfaced to users.
+  experimental?: boolean;
 }
 
 // ---------------- Shadertoy convention ----------------
@@ -689,6 +692,98 @@ void main() {
 `,
 };
 
+// ---------------- Move-gizmo demo ----------------
+// A movable opaque sphere (at iObjectPosition) behind a fixed semi-transparent
+// glass pane. Enable "Move" in the render header and drag the depth (Z) handle
+// to slide the sphere in front of / behind the glass. Tip: orbit a little
+// first so the Z handle has on-screen length (head-on it points at the camera).
+
+const gizmoDemoBody = (mode: "st" | "raw") => {
+  const setup =
+    mode === "st"
+      ? `    vec2 uv = (fragCoord * 2.0 - iResolution.xy) / iResolution.y;
+    vec2 screen01 = fragCoord / iResolution.xy;`
+      : `    vec2 uv = (v_uv - 0.5) * 2.0;
+    uv.x *= iResolution.x / iResolution.y;
+    vec2 screen01 = v_uv;`;
+  const out = mode === "st" ? "fragColor" : "outColor";
+  return `float sphereSdf(vec3 p, vec3 c, float r) { return length(p - c) - r; }
+
+${mode === "st" ? "void mainImage(out vec4 fragColor, in vec2 fragCoord) {" : "void main() {"}
+${setup}
+    float h = tan(iCameraFov * 0.5);
+    vec3 ro = iCameraPosition;
+    vec3 rd = normalize(iCameraForward + uv.x * h * iCameraRight + uv.y * h * iCameraUp);
+
+    // Opaque pass: raymarch the movable sphere, centered on the gizmo.
+    vec3 center = iObjectPosition;
+    float t = 0.0;
+    float hit = 0.0;
+    vec3 p;
+    for (int i = 0; i < 80; i++) {
+        p = ro + rd * t;
+        float d = sphereSdf(p, center, 0.7);
+        if (d < 0.001) { hit = 1.0; break; }
+        t += d;
+        if (t > 40.0) break;
+    }
+
+    vec3 sky = mix(vec3(0.06, 0.08, 0.12), vec3(0.15, 0.2, 0.3), screen01.y);
+    vec3 color = sky;
+    float opaqueT = hit > 0.5 ? t : 1e9;
+    if (hit > 0.5) {
+        vec3 n = normalize(p - center);
+        vec3 l = normalize(vec3(0.5, 0.8, 0.4));
+        float diff = max(dot(n, l), 0.0);
+        float spec = pow(max(dot(reflect(-l, n), -rd), 0.0), 32.0);
+        color = vec3(0.9, 0.55, 0.2) * (0.2 + diff) + spec * 0.6;
+    }
+
+    // Transparent pass: a fixed glass pane at z = 1, bounded to |x|,|y| < 1.5.
+    // Only tints what's behind it (opaqueT), so moving the sphere in front of
+    // the pane removes the tint.
+    if (abs(rd.z) > 1e-4) {
+        float tg = (1.0 - ro.z) / rd.z;
+        vec3 gp = ro + rd * tg;
+        bool inside = tg > 0.0 && abs(gp.x) < 1.5 && abs(gp.y) < 1.5;
+        if (inside && tg < opaqueT) {
+            vec3 glass = vec3(0.4, 0.85, 0.95);
+            float alpha = 0.45;
+            float edge = max(abs(gp.x), abs(gp.y));
+            alpha += smoothstep(1.4, 1.5, edge) * 0.4; // frosted frame
+            color = mix(color, glass, clamp(alpha, 0.0, 0.85));
+        }
+    }
+
+    ${out} = vec4(color, 1.0);
+}
+`;
+};
+
+const gizmoDemoST: ExampleShader = {
+  id: "gizmo-demo-st",
+  pairId: "gizmo-demo",
+  kind: "3D",
+  compatibility: "shadertoy-fragment-v1",
+  name: "Gizmo demo (glass)",
+  description:
+    "Movable sphere behind a glass pane. Turn on 'Move' and drag the Z handle to slide it behind/in front of the glass.",
+  source: gizmoDemoBody("st"),
+  experimental: true,
+};
+
+const gizmoDemoRaw: ExampleShader = {
+  id: "gizmo-demo-raw",
+  pairId: "gizmo-demo",
+  kind: "3D",
+  compatibility: "raw-fragment-v1",
+  name: "Gizmo demo (glass)",
+  description:
+    "Movable sphere behind a glass pane. Turn on 'Move' and drag the Z handle to slide it behind/in front of the glass.",
+  source: gizmoDemoBody("raw"),
+  experimental: true,
+};
+
 export const EXAMPLES: ExampleShader[] = [
   // Shadertoy
   gradientST,
@@ -699,6 +794,7 @@ export const EXAMPLES: ExampleShader[] = [
   torusST,
   groundST,
   fractalST,
+  gizmoDemoST,
   // Raw GLSL
   gradientRaw,
   plasmaRaw,
@@ -708,6 +804,7 @@ export const EXAMPLES: ExampleShader[] = [
   torusRaw,
   groundRaw,
   fractalRaw,
+  gizmoDemoRaw,
 ];
 
 export function findExample(id: string): ExampleShader | undefined {

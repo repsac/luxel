@@ -84,6 +84,26 @@ pub const DEFAULT_GLSL_SHADERTOY: &str = r#"void mainImage(out vec4 fragColor, i
 /// Back-compat alias for code that referenced the old single constant.
 pub const DEFAULT_GLSL: &str = DEFAULT_GLSL_RAW;
 
+/// POC: a single manipulable object transform, driven by the move gizmo in
+/// the render view and exposed to shaders as the `iObjectPosition` uniform.
+///
+/// Move-only for now (a `vec3` offset). Rotation/scale would extend this to a
+/// full transform plus a `mat4` uniform; the gizmo and shader convention would
+/// grow accordingly. Kept additive (`#[serde(default)]` on the Scene field) so
+/// it doesn't require a schema bump while it's still proof-of-concept.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
+pub struct ObjectTransform {
+    pub position: [f32; 3],
+}
+
+impl Default for ObjectTransform {
+    fn default() -> Self {
+        Self {
+            position: [0.0, 0.0, 0.0],
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Scene {
     pub name: String,
@@ -98,6 +118,11 @@ pub struct Scene {
     /// `targetFps`). Persisted so a scene reopens at the same playhead.
     #[serde(default)]
     pub timeline: TimelineState,
+    /// POC move-gizmo object transform, exposed as `iObjectPosition`.
+    /// Additive + defaulted so older scenes (and ones authored before this
+    /// feature) load with the object at the origin.
+    #[serde(default)]
+    pub object: ObjectTransform,
 }
 
 impl Default for Scene {
@@ -110,6 +135,7 @@ impl Default for Scene {
             camera_bookmarks: vec![CameraBookmark::default_bookmark()],
             layout: LayoutState::default(),
             timeline: TimelineState::default(),
+            object: ObjectTransform::default(),
         }
     }
 }
