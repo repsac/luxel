@@ -54,7 +54,7 @@ pub fn wrap_raw_fragment(user_source: &str) -> String {
 /// profile. Used to map naga error line numbers back to the user's editor
 /// coordinates. Keep these constants in sync with the actual prelude strings.
 pub const SHADERTOY_PRELUDE_LINE_COUNT: u32 = 23;
-pub const RAW_PRELUDE_LINE_COUNT: u32 = 23;
+pub const RAW_PRELUDE_LINE_COUNT: u32 = 39;
 
 /// Lines consumed by the prelude (including the trailing
 /// `// ---- user shader ----` marker line). Used by the shader compiler to
@@ -134,6 +134,22 @@ layout(set = 0, binding = 0) uniform LuxelUniforms {
 
 layout(location = 0) in vec2 v_uv;
 layout(location = 0) out vec4 outColor;
+
+// Coordinate helpers ---
+//
+// gl_FragCoord follows Vulkan convention: Y = 0 at the TOP of the screen,
+// increasing downward. Standard OpenGL has Y = 0 at the BOTTOM. If you're
+// porting code that uses gl_FragCoord with OpenGL semantics, use these:
+
+// OpenGL-style fragment coordinate: origin at bottom-left, Y up.
+vec4 fragCoordGL() {
+    return vec4(gl_FragCoord.x, iResolution.y - gl_FragCoord.y, gl_FragCoord.z, gl_FragCoord.w);
+}
+
+// Shorthand: just the .xy with OpenGL convention.
+vec2 fragCoord() {
+    return vec2(gl_FragCoord.x, iResolution.y - gl_FragCoord.y);
+}
 "#;
 
 #[cfg(test)]
@@ -195,6 +211,39 @@ mod tests {
                 assert!(wrapped.contains(u), "{compat:?} prelude missing {u}");
             }
         }
+    }
+
+    #[test]
+    fn raw_prelude_exposes_fragcoord_helpers() {
+        let wrapped = wrap_raw_fragment("void main(){ outColor = vec4(fragCoord(), 0.0, 1.0); }");
+        assert!(wrapped.contains("vec2 fragCoord()"), "raw prelude missing fragCoord()");
+        assert!(wrapped.contains("vec4 fragCoordGL()"), "raw prelude missing fragCoordGL()");
+    }
+
+    #[test]
+    fn raw_prelude_fragcoord_helpers_compile() {
+        // The helpers reference gl_FragCoord and iResolution, both of which
+        // must be in scope. This test compiles a real shader through naga to
+        // prove the prelude is self-contained and the function signatures
+        // are valid GLSL 450.
+        let src = luxel_core::ShaderSource {
+            language: luxel_core::ShaderLanguage::Glsl,
+            source: r#"void main() {
+    vec2 fc = fragCoord();
+    vec4 fcGL = fragCoordGL();
+    outColor = vec4(fc / iResolution.xy, fcGL.z, 1.0);
+}
+"#
+            .to_string(),
+            entry_point: "main".to_string(),
+            compatibility: luxel_core::ShaderCompatibility::RawFragmentV1,
+        };
+        let result = crate::shader::compile_glsl_fragment(&src);
+        assert!(
+            result.is_ok(),
+            "fragCoord helpers should compile: {:?}",
+            result.err()
+        );
     }
 
     #[test]
