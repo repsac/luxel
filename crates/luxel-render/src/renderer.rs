@@ -291,7 +291,9 @@ impl Renderer {
             .map_err(|e| RenderError::Readback(format!("{e:?}")))?;
         let data = slice.get_mapped_range();
         let mut pixels = Vec::with_capacity((unpadded_bpr as usize) * (height as usize));
-        for row in 0..height {
+        // Read rows in reverse so gl_FragCoord follows OpenGL convention:
+        // Y = 0 at the bottom of the screen, increasing upward.
+        for row in (0..height).rev() {
             let start = (row * padded_bpr) as usize;
             let end = start + unpadded_bpr as usize;
             pixels.extend_from_slice(&data[start..end]);
