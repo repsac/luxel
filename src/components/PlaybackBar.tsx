@@ -17,7 +17,9 @@ export default function PlaybackBar() {
   const setTimeline = useSceneStore((s) => s.setTimeline);
   const isPlaying = useAppStore((s) => s.isPlaying);
   const playDirection = useAppStore((s) => s.playDirection);
+  const loopPlayback = useAppStore((s) => s.loopPlayback);
   const togglePlay = useAppStore((s) => s.togglePlay);
+  const toggleLoopPlayback = useAppStore((s) => s.toggleLoopPlayback);
   const pause = useAppStore((s) => s.pause);
 
   if (!file) return null;
@@ -115,6 +117,14 @@ export default function PlaybackBar() {
         </button>
         <button onClick={jumpToEnd} title="Go to last frame (End)" aria-label="Last frame">
           ⏭
+        </button>
+        <button
+          onClick={toggleLoopPlayback}
+          className={loopPlayback ? "primary" : ""}
+          title="Loop playback — wrap around at timeline bounds"
+          aria-label="Toggle loop"
+        >
+          🔁
         </button>
       </div>
 

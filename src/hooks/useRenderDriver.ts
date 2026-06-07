@@ -69,13 +69,22 @@ export function useRenderDriver(): void {
           frameAccumulatorRef.current -= step;
           let next = t.currentFrame + step;
           let pause = false;
-          if (next >= t.lastFrame) {
-            next = t.lastFrame;
-            pause = dir > 0;
+          const loop = a.loopPlayback;
+          if (next > t.lastFrame) {
+            if (loop) {
+              next = t.firstFrame + (next - t.lastFrame - 1);
+            } else {
+              next = t.lastFrame;
+              pause = dir > 0;
+            }
           }
-          if (next <= t.firstFrame) {
-            next = t.firstFrame;
-            pause = pause || dir < 0;
+          if (next < t.firstFrame) {
+            if (loop) {
+              next = t.lastFrame - (t.firstFrame - next - 1);
+            } else {
+              next = t.firstFrame;
+              pause = dir < 0;
+            }
           }
           if (next !== t.currentFrame) {
             useSceneStore.getState().setCurrentFrame(next);

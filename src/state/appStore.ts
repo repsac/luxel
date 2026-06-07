@@ -29,6 +29,9 @@ interface AppStore {
   isPlaying: boolean;
   /// +1 = play forward, -1 = play backward. Ignored when `isPlaying` is false.
   playDirection: 1 | -1;
+  /// When true, playback wraps from last→first (or first→last when reversed)
+  /// instead of auto-pausing at the timeline bounds.
+  loopPlayback: boolean;
   renderCanvas: HTMLCanvasElement | null;
   /// Pixel size of the render viewport — drives iResolution so the preview
   /// always fills the panel. Cap is enforced by the consumer.
@@ -63,6 +66,8 @@ interface AppStore {
   play: (direction?: 1 | -1) => void;
   pause: () => void;
   togglePlay: (direction?: 1 | -1) => void;
+  setLoopPlayback: (on: boolean) => void;
+  toggleLoopPlayback: () => void;
   setRenderCanvas: (c: HTMLCanvasElement | null) => void;
   setPreviewSize: (w: number, h: number) => void;
   setRenderQuality: (q: number) => void;
@@ -82,6 +87,7 @@ interface AppStore {
 }
 
 const AUTO_RENDER_KEY = "luxel.autoRender";
+const LOOP_PLAYBACK_KEY = "luxel.loopPlayback";
 const SHOW_FPS_KEY = "luxel.showFps";
 const SHOW_FRUSTUM_KEY = "luxel.showFrustumOverlay";
 const EDITOR_FONT_KEY = "luxel.editorFontSize";
@@ -165,6 +171,7 @@ export const useAppStore = create<AppStore>((set) => ({
   lastShaderError: null,
   isPlaying: false,
   playDirection: 1,
+  loopPlayback: readStoredFlag(LOOP_PLAYBACK_KEY, false),
   renderCanvas: null,
   previewWidth: 0,
   previewHeight: 0,
@@ -193,6 +200,16 @@ export const useAppStore = create<AppStore>((set) => ({
         return { isPlaying: false };
       }
       return { isPlaying: true, playDirection: direction };
+    }),
+  setLoopPlayback: (on) => {
+    writeStoredFlag(LOOP_PLAYBACK_KEY, on);
+    set({ loopPlayback: on });
+  },
+  toggleLoopPlayback: () =>
+    set((s) => {
+      const next = !s.loopPlayback;
+      writeStoredFlag(LOOP_PLAYBACK_KEY, next);
+      return { loopPlayback: next };
     }),
   setRenderCanvas: (c) => set({ renderCanvas: c }),
   setPreviewSize: (w, h) => set({ previewWidth: w, previewHeight: h }),
