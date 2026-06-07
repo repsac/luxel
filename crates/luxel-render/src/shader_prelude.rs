@@ -100,7 +100,7 @@ layout(location = 0) out vec4 outColor;
 const SHADERTOY_EPILOGUE: &str = r#"
 // ---- entry point ----
 void main() {
-    vec2 fragCoord = vec2(v_uv.x, 1.0 - v_uv.y) * iResolution.xy;
+    vec2 fragCoord = v_uv * iResolution.xy;
     vec4 outFrag = vec4(0.0);
     mainImage(outFrag, fragCoord);
     outColor = outFrag;

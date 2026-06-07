@@ -75,6 +75,7 @@ export default function Toolbar() {
 
   const renderQuality = useAppStore((s) => s.renderQuality);
   const setRenderQuality = useAppStore((s) => s.setRenderQuality);
+  const autoRender = useAppStore((s) => s.autoRender);
   const showFps = useAppStore((s) => s.showFps);
   const toggleFps = useAppStore((s) => s.toggleFps);
   const canvas = useAppStore((s) => s.renderCanvas);
@@ -431,9 +432,18 @@ export default function Toolbar() {
 
       <LayoutMenu />
 
-      <button onClick={render} className="primary" title="Render (Cmd/Ctrl+Enter)">
+      <button onClick={render} className={autoRender ? "" : "primary"} title="Render (Cmd/Ctrl+Enter)">
         Render
       </button>
+
+      <select
+        value={autoRender ? "auto" : "manual"}
+        onChange={(e) => useAppStore.getState().setAutoRender(e.target.value === "auto")}
+        title="Auto: re-render on every change. Manual: only render on Render button / Cmd+Enter."
+      >
+        <option value="auto">Auto</option>
+        <option value="manual">Manual</option>
+      </select>
       <button onClick={exportPng} title="Save the current render as a PNG">
         Export PNG
       </button>

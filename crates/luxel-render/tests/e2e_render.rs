@@ -99,24 +99,22 @@ fn raw_glsl_scene_renders_a_gradient() {
     scene.render_settings.height = 64;
     let result = r.render_single_frame(&scene).expect("raw glsl render");
     let pixels = &result.pixels;
-    // After the Y-flip readback, display top = v_uv.y=0, bottom = v_uv.y=1.
-    // Top-right (row 0, col 63): v_uv ≈ (1, 0) → red high, green low.
-    // Bottom-left (row 63, col 0): v_uv ≈ (0, 1) → red low, green high.
+    // Top-left: v_uv ≈ (0, 1) → green high, red low.
+    // Bottom-right: v_uv ≈ (1, 0) → red high, green low.
+    let tl = &pixels[..4];
     let stride = 64 * 4;
-    let tr_offset = 63 * 4;
-    let tr = &pixels[tr_offset..tr_offset + 4];
-    let bl_offset = 63 * stride;
-    let bl = &pixels[bl_offset..bl_offset + 4];
+    let br_offset = 63 * stride + 63 * 4;
+    let br = &pixels[br_offset..br_offset + 4];
     assert!(
-        tr[0] > tr[1],
-        "top-right should be redder than green (v_uv ≈ 1,0), got R={} G={}",
-        tr[0],
-        tr[1]
+        tl[1] > tl[0],
+        "top-left should be greener than red, got R={} G={}",
+        tl[0],
+        tl[1]
     );
     assert!(
-        bl[1] > bl[0],
-        "bottom-left should be greener than red (v_uv ≈ 0,1), got R={} G={}",
-        bl[0],
-        bl[1]
+        br[0] > br[1],
+        "bottom-right should be redder than green, got R={} G={}",
+        br[0],
+        br[1]
     );
 }

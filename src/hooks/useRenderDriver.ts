@@ -91,7 +91,7 @@ export function useRenderDriver(): void {
         frameAccumulatorRef.current = 0;
       }
 
-      if (!renderingRef.current && dirtyRef.current) {
+      if (!renderingRef.current && dirtyRef.current && (a.autoRender || a.isPlaying)) {
         const current = useSceneStore.getState().file;
         const appState = useAppStore.getState();
         if (current && appState.previewWidth > 0 && appState.previewHeight > 0) {

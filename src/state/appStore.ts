@@ -47,6 +47,9 @@ interface AppStore {
   /// an axis handle moves the object (iObjectPosition) instead of orbiting
   /// the camera. POC-grade; not persisted.
   gizmoEnabled: boolean;
+  /// When true the render driver auto-renders on every change. When false,
+  /// rendering only happens on explicit Render button / Cmd+Enter.
+  autoRender: boolean;
   /// Font size used in the GLSL editor, in CSS pixels. Persisted via
   /// localStorage so it survives restarts.
   editorFontSize: number;
@@ -69,6 +72,8 @@ interface AppStore {
   toggleFrustumOverlay: () => void;
   setGizmoEnabled: (on: boolean) => void;
   toggleGizmo: () => void;
+  setAutoRender: (on: boolean) => void;
+  toggleAutoRender: () => void;
   setEditorFontSize: (size: number) => void;
   increaseEditorFontSize: () => void;
   decreaseEditorFontSize: () => void;
@@ -76,6 +81,7 @@ interface AppStore {
   recordRenderCompleted: (now?: number) => void;
 }
 
+const AUTO_RENDER_KEY = "luxel.autoRender";
 const SHOW_FPS_KEY = "luxel.showFps";
 const SHOW_FRUSTUM_KEY = "luxel.showFrustumOverlay";
 const EDITOR_FONT_KEY = "luxel.editorFontSize";
@@ -165,6 +171,7 @@ export const useAppStore = create<AppStore>((set) => ({
   renderQuality: 1.0,
   showFps: readStoredFlag(SHOW_FPS_KEY, false),
   showFrustumOverlay: readStoredFlag(SHOW_FRUSTUM_KEY, false),
+  autoRender: readStoredFlag(AUTO_RENDER_KEY, true),
   gizmoEnabled: false,
   editorFontSize: clampFont(readStoredNumber(EDITOR_FONT_KEY, EDITOR_FONT_DEFAULT)),
   renderTimestamps: [],
@@ -212,6 +219,16 @@ export const useAppStore = create<AppStore>((set) => ({
     }),
   setGizmoEnabled: (on) => set({ gizmoEnabled: on }),
   toggleGizmo: () => set((s) => ({ gizmoEnabled: !s.gizmoEnabled })),
+  setAutoRender: (on) => {
+    writeStoredFlag(AUTO_RENDER_KEY, on);
+    set({ autoRender: on });
+  },
+  toggleAutoRender: () =>
+    set((s) => {
+      const next = !s.autoRender;
+      writeStoredFlag(AUTO_RENDER_KEY, next);
+      return { autoRender: next };
+    }),
   setEditorFontSize: (size) =>
     set(() => {
       const next = clampFont(size);
