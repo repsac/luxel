@@ -8,6 +8,7 @@ import {
 import RenderView from "./RenderView";
 import ShaderEditor from "./ShaderEditor";
 import ConsolePanel from "./ConsolePanel";
+import InspectorPanel from "./InspectorPanel";
 import StatusLine from "./StatusLine";
 import Toolbar from "./Toolbar";
 import PlaybackBar from "./PlaybackBar";
@@ -320,6 +321,8 @@ function renderView(view: ViewId): ReactNode {
       return <ShaderEditor />;
     case "console":
       return <ConsolePanel />;
+    case "inspector":
+      return <InspectorPanel />;
     case "empty":
       return <EmptyView />;
   }

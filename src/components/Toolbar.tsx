@@ -8,6 +8,7 @@ import { EXAMPLES, type ExampleShader } from "../examples";
 import { GIZMO_POC_ENABLED } from "../featureFlags";
 import LayoutMenu from "./LayoutMenu";
 import { HelpButton } from "./HelpModal";
+import { AboutButton } from "./AboutModal";
 import {
   APP_VERSION,
   BUILD_DIRTY,
@@ -140,6 +141,17 @@ export default function Toolbar() {
         return;
       }
       if (e.metaKey || e.ctrlKey) {
+        // Shift+Cmd/Ctrl +/- scales the inspector font; plain Cmd/Ctrl +/- scales the editor.
+        if (e.shiftKey && (e.key === "=" || e.key === "+")) {
+          e.preventDefault();
+          useAppStore.getState().increaseInspectorFontSize();
+          return;
+        }
+        if (e.shiftKey && (e.key === "-" || e.key === "_")) {
+          e.preventDefault();
+          useAppStore.getState().decreaseInspectorFontSize();
+          return;
+        }
         if (e.key === "=" || e.key === "+") {
           e.preventDefault();
           useAppStore.getState().increaseEditorFontSize();
@@ -474,6 +486,7 @@ export default function Toolbar() {
       </span>
 
       <HelpButton />
+      <AboutButton />
       <span className="spacer" />
       <span className="scene-name">
         {path ? path.split(/[\\/]/).pop() : file?.scene.name ?? "—"}

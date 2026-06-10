@@ -3,6 +3,22 @@ import type { ConsoleEvent } from "./consoleStore";
 
 export type ShaderStatus = "clean" | "compiling" | "compiled" | "error";
 
+export interface PixelInfo {
+  /// Pixel coordinate in render resolution (bottom-left origin).
+  px: number;
+  py: number;
+  /// Resolution of the current render.
+  resX: number;
+  resY: number;
+  /// Normalized UV (0-1). u=0 left, v=0 bottom (OpenGL convention).
+  u: number;
+  v: number;
+  /// sRGB color at the pixel, 0-255.
+  r: number;
+  g: number;
+  b: number;
+}
+
 export interface LastRender {
   totalMs: number;
   width: number;
@@ -53,6 +69,13 @@ interface AppStore {
   /// When true the render driver auto-renders on every change. When false,
   /// rendering only happens on explicit Render button / Cmd+Enter.
   autoRender: boolean;
+  /// Whether the pixel-inspector footer bar is visible in the render view.
+  pixelInspector: boolean;
+  /// Current pixel data under the cursor (null when not hovering the canvas).
+  pixelInfo: PixelInfo | null;
+  /// Font size used in the inspector panel, in CSS pixels. Persisted via
+  /// localStorage so it survives restarts.
+  inspectorFontSize: number;
   /// Font size used in the GLSL editor, in CSS pixels. Persisted via
   /// localStorage so it survives restarts.
   editorFontSize: number;
@@ -79,6 +102,13 @@ interface AppStore {
   toggleGizmo: () => void;
   setAutoRender: (on: boolean) => void;
   toggleAutoRender: () => void;
+  setPixelInspector: (on: boolean) => void;
+  togglePixelInspector: () => void;
+  setPixelInfo: (info: PixelInfo | null) => void;
+  setInspectorFontSize: (size: number) => void;
+  increaseInspectorFontSize: () => void;
+  decreaseInspectorFontSize: () => void;
+  resetInspectorFontSize: () => void;
   setEditorFontSize: (size: number) => void;
   increaseEditorFontSize: () => void;
   decreaseEditorFontSize: () => void;
@@ -87,6 +117,9 @@ interface AppStore {
 }
 
 const AUTO_RENDER_KEY = "luxel.autoRender";
+const PIXEL_INSPECTOR_KEY = "luxel.pixelInspector";
+const INSPECTOR_FONT_KEY = "luxel.inspectorFontSize";
+export const INSPECTOR_FONT_DEFAULT = 14;
 const LOOP_PLAYBACK_KEY = "luxel.loopPlayback";
 const SHOW_FPS_KEY = "luxel.showFps";
 const SHOW_FRUSTUM_KEY = "luxel.showFrustumOverlay";
@@ -179,6 +212,9 @@ export const useAppStore = create<AppStore>((set) => ({
   showFps: readStoredFlag(SHOW_FPS_KEY, false),
   showFrustumOverlay: readStoredFlag(SHOW_FRUSTUM_KEY, false),
   autoRender: readStoredFlag(AUTO_RENDER_KEY, true),
+  pixelInspector: readStoredFlag(PIXEL_INSPECTOR_KEY, false),
+  pixelInfo: null,
+  inspectorFontSize: clampFont(readStoredNumber(INSPECTOR_FONT_KEY, INSPECTOR_FONT_DEFAULT)),
   gizmoEnabled: false,
   editorFontSize: clampFont(readStoredNumber(EDITOR_FONT_KEY, EDITOR_FONT_DEFAULT)),
   renderTimestamps: [],
@@ -245,6 +281,40 @@ export const useAppStore = create<AppStore>((set) => ({
       const next = !s.autoRender;
       writeStoredFlag(AUTO_RENDER_KEY, next);
       return { autoRender: next };
+    }),
+  setPixelInspector: (on) => {
+    writeStoredFlag(PIXEL_INSPECTOR_KEY, on);
+    set({ pixelInspector: on });
+  },
+  togglePixelInspector: () =>
+    set((s) => {
+      const next = !s.pixelInspector;
+      writeStoredFlag(PIXEL_INSPECTOR_KEY, next);
+      return { pixelInspector: next };
+    }),
+  setPixelInfo: (info) => set({ pixelInfo: info }),
+  setInspectorFontSize: (size) =>
+    set(() => {
+      const next = clampFont(size);
+      writeStoredNumber(INSPECTOR_FONT_KEY, next);
+      return { inspectorFontSize: next };
+    }),
+  increaseInspectorFontSize: () =>
+    set((s) => {
+      const next = clampFont(s.inspectorFontSize + 1);
+      writeStoredNumber(INSPECTOR_FONT_KEY, next);
+      return { inspectorFontSize: next };
+    }),
+  decreaseInspectorFontSize: () =>
+    set((s) => {
+      const next = clampFont(s.inspectorFontSize - 1);
+      writeStoredNumber(INSPECTOR_FONT_KEY, next);
+      return { inspectorFontSize: next };
+    }),
+  resetInspectorFontSize: () =>
+    set(() => {
+      writeStoredNumber(INSPECTOR_FONT_KEY, INSPECTOR_FONT_DEFAULT);
+      return { inspectorFontSize: INSPECTOR_FONT_DEFAULT };
     }),
   setEditorFontSize: (size) =>
     set(() => {

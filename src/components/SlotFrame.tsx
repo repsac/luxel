@@ -9,7 +9,7 @@ interface Props {
   children: ReactNode;
 }
 
-const ALL_VIEWS: ViewId[] = ["render", "editor", "console", "empty"];
+const ALL_VIEWS: ViewId[] = ["render", "editor", "console", "inspector", "empty"];
 
 /// Thin slot-level toolbar above each panel: pick the view, maximize/restore.
 export default function SlotFrame({ slotIndex, view, children }: Props) {

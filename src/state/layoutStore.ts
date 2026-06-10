@@ -152,6 +152,7 @@ export const VIEW_LABELS: Record<ViewId, string> = {
   render: "Render",
   editor: "Editor",
   console: "Console",
+  inspector: "Inspector",
   empty: "Empty",
 };
 

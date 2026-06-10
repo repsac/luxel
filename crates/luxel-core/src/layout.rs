@@ -7,6 +7,7 @@ pub enum ViewId {
     Render,
     Editor,
     Console,
+    Inspector,
     Empty,
 }
 

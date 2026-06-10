@@ -284,6 +284,47 @@ button.primary:hover { background: #3580f0; }
   letter-spacing: 0.06em;
   color: #6b7886;
 }
+
+/* About modal */
+.about-modal {
+  max-width: 420px;
+}
+.about-body {
+  text-align: left;
+}
+.about-tagline {
+  font-size: 14px;
+  color: #8a95a3;
+  margin: 0 0 16px;
+}
+.about-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 16px;
+}
+.about-table td {
+  padding: 6px 0;
+  border-bottom: 1px solid #1c2531;
+}
+.about-table td:first-child {
+  color: #6b7886;
+  width: 80px;
+  font-weight: 500;
+}
+.about-table a {
+  color: #5b9bd5;
+  text-decoration: none;
+}
+.about-table a:hover {
+  text-decoration: underline;
+}
+.about-license-text {
+  font-size: 11px;
+  color: #5d6a78;
+  margin: 0;
+  line-height: 1.5;
+}
+
 .slot-row {
   display: grid;
   grid-template-columns: 16px 1fr auto;
@@ -613,6 +654,86 @@ button.primary:hover { background: #3580f0; }
 .render-panel > header {
   flex-wrap: wrap;
   row-gap: 4px;
+}
+.pixel-inspector {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 3px 8px;
+  background: #0d121a;
+  border-top: 1px solid #1a2330;
+  font-family: ui-monospace, "JetBrains Mono", Menlo, monospace;
+  font-size: 11px;
+  color: #8b97a6;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.pi-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.pi-label {
+  color: #5d6a78;
+  font-weight: 600;
+}
+.pi-swatch {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border: 1px solid #2a3444;
+  border-radius: 2px;
+  vertical-align: middle;
+}
+.pi-hint {
+  color: #3d4a58;
+  font-style: italic;
+}
+
+/* ---- Inspector panel ---- */
+.inspector-panel { min-height: 100px; }
+.inspector-body {
+  flex: 1;
+  overflow: auto;
+  padding: 8px 12px;
+  font-family: ui-monospace, "JetBrains Mono", Menlo, monospace;
+  line-height: 1.6;
+  color: #b9c4d2;
+}
+.inspector-section {
+  margin-bottom: 12px;
+}
+.inspector-section-title {
+  font-weight: 700;
+  color: #7ad3ff;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 4px;
+  border-bottom: 1px solid #1a2330;
+  padding-bottom: 2px;
+}
+.inspector-rows {
+  padding-left: 8px;
+}
+.inspector-row {
+  display: flex;
+  gap: 8px;
+}
+.inspector-label {
+  color: #5d6a78;
+  min-width: 10ch;
+  flex-shrink: 0;
+}
+.inspector-label::after {
+  content: ":";
+}
+.inspector-value {
+  color: #d8d8d8;
+}
+.inspector-rgb {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 .cam-pos {
   font-family: ui-monospace, "JetBrains Mono", Menlo, monospace;

@@ -40,6 +40,10 @@ export default function RenderView() {
   const showFrustum = useAppStore((s) => s.showFrustumOverlay);
   const gizmoEnabled = useAppStore((s) => s.gizmoEnabled);
   const toggleGizmo = useAppStore((s) => s.toggleGizmo);
+  const pixelInspector = useAppStore((s) => s.pixelInspector);
+  const togglePixelInspector = useAppStore((s) => s.togglePixelInspector);
+  const pixelInfo = useAppStore((s) => s.pixelInfo);
+  const setPixelInfo = useAppStore((s) => s.setPixelInfo);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const [wrapPx, setWrapPx] = useState({ w: 0, h: 0 });
@@ -132,6 +136,37 @@ export default function RenderView() {
     return { x: e.clientX - (rect?.left ?? 0), y: e.clientY - (rect?.top ?? 0) };
   }
 
+  function samplePixel(e: React.PointerEvent | React.MouseEvent) {
+    if (!pixelInspector || !lastRender) {
+      setPixelInfo(null);
+      return;
+    }
+    const rect = wrapRef.current?.getBoundingClientRect();
+    if (!rect || rect.width === 0 || rect.height === 0) return;
+    // Map CSS pointer position → render-resolution pixel coordinate.
+    const cx = (e.clientX - rect.left) / rect.width;
+    const cy = (e.clientY - rect.top) / rect.height;
+    const px = Math.floor(cx * lastRender.width);
+    const py = Math.floor(cy * lastRender.height);
+    if (px < 0 || px >= lastRender.width || py < 0 || py >= lastRender.height) {
+      setPixelInfo(null);
+      return;
+    }
+    const idx = (py * lastRender.width + px) * 4;
+    const r = lastRender.pixels[idx];
+    const g = lastRender.pixels[idx + 1];
+    const b = lastRender.pixels[idx + 2];
+    // UV: u goes 0→1 left-to-right, v goes 0→1 bottom-to-top (OpenGL).
+    // Display row 0 = top of screen = v=1, display row (height-1) = bottom = v=0.
+    const u = (px + 0.5) / lastRender.width;
+    const v = 1.0 - (py + 0.5) / lastRender.height;
+    setPixelInfo({
+      px, py: lastRender.height - 1 - py,
+      resX: lastRender.width, resY: lastRender.height,
+      u, v, r, g, b,
+    });
+  }
+
   function onPointerDown(e: React.PointerEvent) {
     // Gizmo grabs the pointer before camera controls if a handle is hit.
     if (gizmo && gizmo.origin.visible && e.button === 0) {
@@ -154,6 +189,7 @@ export default function RenderView() {
   }
   function onPointerMove(e: React.PointerEvent) {
     if (!file) return;
+    samplePixel(e);
 
     // Gizmo drag takes priority while active.
     const gd = gizmoDragRef.current;
@@ -243,6 +279,13 @@ export default function RenderView() {
             obj [{objPos.map((n) => n.toFixed(2)).join(", ")}]
           </span>
         )}
+        <button
+          onClick={togglePixelInspector}
+          className={pixelInspector ? "primary" : ""}
+          title="Toggle pixel inspector — shows resolution, UV, and color under the cursor"
+        >
+          Inspect
+        </button>
       </header>
       <div
         ref={wrapRef}
@@ -250,6 +293,7 @@ export default function RenderView() {
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
+        onPointerLeave={() => setPixelInfo(null)}
         onWheel={onWheel}
       >
         <canvas ref={canvasRef} className="render-canvas" />
@@ -313,6 +357,36 @@ export default function RenderView() {
           </svg>
         )}
       </div>
+      {pixelInspector && (
+        <footer className="pixel-inspector">
+          {pixelInfo ? (
+            <>
+              <span className="pi-group" title="Pixel coordinate (bottom-left origin)">
+                <span className="pi-label">Px</span>
+                {pixelInfo.px}, {pixelInfo.py}
+              </span>
+              <span className="pi-group" title="Render resolution">
+                <span className="pi-label">Res</span>
+                {pixelInfo.resX} × {pixelInfo.resY}
+              </span>
+              <span className="pi-group" title="UV coordinate (0–1)">
+                <span className="pi-label">UV</span>
+                {pixelInfo.u.toFixed(3)}, {pixelInfo.v.toFixed(3)}
+              </span>
+              <span className="pi-group" title="Pixel color (sRGB 0–255)">
+                <span className="pi-label">RGB</span>
+                {pixelInfo.r}, {pixelInfo.g}, {pixelInfo.b}
+                <span
+                  className="pi-swatch"
+                  style={{ background: `rgb(${pixelInfo.r},${pixelInfo.g},${pixelInfo.b})` }}
+                />
+              </span>
+            </>
+          ) : (
+            <span className="pi-hint">Hover over render to inspect</span>
+          )}
+        </footer>
+      )}
     </section>
   );
 }
