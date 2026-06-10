@@ -13,9 +13,10 @@ interface GitInfo {
   /// Short SHA — useful for diagnostics in the help modal even though it's
   /// not the primary identifier.
   hash: string;
-  /// True if the working tree has any tracked-or-untracked changes (anything
-  /// `git status --porcelain` would report). This lets us tag dev builds so
-  /// nobody mistakes an un-pushed change for a clean release.
+  /// True if tracked files differ from HEAD in content, or there are untracked
+  /// files. Content-based (`git diff`) rather than `git status --porcelain` so a
+  /// file that's merely touched — tauri-build touches Cargo.toml, core.autocrlf
+  /// re-filters line endings — doesn't falsely tag the build `-dirty`.
   dirty: boolean;
 }
 
@@ -25,11 +26,26 @@ function captureGit(): GitInfo {
       encoding: "utf-8",
       stdio: ["ignore", "pipe", "ignore"],
     }).trim();
+  // `git diff --quiet HEAD` exits non-zero when tracked files differ in
+  // content. We use it instead of `git status --porcelain`, which keys off the
+  // stat cache and reports a phantom "modified" whenever a tool merely touches
+  // a tracked file (tauri-build touches Cargo.toml; core.autocrlf re-filters its
+  // line endings) — that would otherwise stamp every build `-dirty`.
+  const hasTrackedChanges = (): boolean => {
+    try {
+      execSync("git diff --quiet HEAD", { stdio: "ignore" });
+      return false;
+    } catch {
+      return true;
+    }
+  };
   try {
     return {
       number: run(["rev-list", "--count", "HEAD"]),
       hash: run(["rev-parse", "--short", "HEAD"]),
-      dirty: run(["status", "--porcelain"]).length > 0,
+      dirty:
+        hasTrackedChanges() ||
+        run(["ls-files", "--others", "--exclude-standard"]).length > 0,
     };
   } catch {
     return { number: "dev", hash: "dev", dirty: false };
