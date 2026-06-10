@@ -41,7 +41,7 @@ function captureGit(): GitInfo {
   };
   try {
     return {
-      number: run(["rev-list", "--count", "HEAD"]),
+      number: run(["rev-list", "--first-parent", "--count", "HEAD"]),
       hash: run(["rev-parse", "--short", "HEAD"]),
       dirty:
         hasTrackedChanges() ||

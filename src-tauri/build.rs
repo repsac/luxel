@@ -41,7 +41,7 @@ struct GitInfo {
 }
 
 fn capture_git() -> GitInfo {
-    let number = run_git(&["rev-list", "--count", "HEAD"]).unwrap_or_else(|| "dev".to_string());
+    let number = run_git(&["rev-list", "--first-parent", "--count", "HEAD"]).unwrap_or_else(|| "dev".to_string());
     let hash = run_git(&["rev-parse", "--short", "HEAD"]).unwrap_or_else(|| "dev".to_string());
     // Use a *content* comparison instead of `git status --porcelain`. Porcelain
     // keys off the stat cache, so any tool that merely touches a tracked file
