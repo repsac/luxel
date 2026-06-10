@@ -60,7 +60,7 @@ export default function AboutModal({ open, onClose }: Props) {
             </tbody>
           </table>
           <p className="about-license-text">
-            Copyright &copy; 2025 Ed Caspersen. Released under the MIT License.
+            Copyright &copy; 2026 Ed Caspersen. Released under the MIT License.
             See the LICENSE file in the project root for full terms.
           </p>
         </div>
@@ -74,7 +74,7 @@ export function AboutButton() {
   return (
     <>
       <button onClick={() => setOpen(true)} title="About Luxel">
-        About
+        &#x24D8;
       </button>
       <AboutModal open={open} onClose={() => setOpen(false)} />
     </>
