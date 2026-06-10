@@ -1,0 +1,36 @@
+{
+  "appVersion": "0.1.0",
+  "scene": {
+    "name": "Missing version",
+    "shader": {
+      "language": "glsl",
+      "source": "void mainImage(out vec4 c, in vec2 p){ c = vec4(0); }",
+      "entryPoint": "mainImage",
+      "compatibility": "shadertoy-fragment-v1"
+    },
+    "renderSettings": {
+      "mode": "single_frame",
+      "width": 100,
+      "height": 100,
+      "aspectRatio": "1:1",
+      "showFrustumOverlay": false
+    },
+    "camera": {
+      "position": [0, 0, 5],
+      "target": [0, 0, 0],
+      "up": [0, 1, 0],
+      "fovYDegrees": 45,
+      "near": 0.1,
+      "far": 1000
+    },
+    "cameraBookmarks": [],
+    "layout": {
+      "maximizedView": null,
+      "panels": {
+        "render": { "visible": true, "size": 0.5 },
+        "editor": { "visible": true, "size": 0.35 },
+        "console": { "visible": true, "size": 0.15 }
+      }
+    }
+  }
+}

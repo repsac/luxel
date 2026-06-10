@@ -1,0 +1,54 @@
+{
+  "schemaVersion": 3,
+  "appVersion": "0.1.0",
+  "scene": {
+    "name": "Untitled Shader Scene",
+    "shader": {
+      "language": "glsl",
+      "source": "// Raw GLSL — you own main(). The prelude supplies:\n//   in  vec2 v_uv;        // [0,0] bottom-left, [1,1] top-right\n//   out vec4 outColor;\n//   + uniforms (iResolution, iTime, iCameraPosition, ...)\n\nvoid main() {\n    vec2 uv = v_uv;\n    outColor = vec4(uv.x, uv.y, 0.35 + 0.25 * sin(iTime), 1.0);\n}\n",
+      "entryPoint": "main",
+      "compatibility": "raw-fragment-v1"
+    },
+    "renderSettings": {
+      "mode": "single_frame",
+      "width": 1280,
+      "height": 720,
+      "aspectRatio": "16:9",
+      "showFrustumOverlay": false
+    },
+    "camera": {
+      "position": [0.0, 0.0, 5.0],
+      "target": [0.0, 0.0, 0.0],
+      "up": [0.0, 1.0, 0.0],
+      "fovYDegrees": 45.0,
+      "near": 0.1,
+      "far": 1000.0
+    },
+    "cameraBookmarks": [
+      {
+        "id": "default",
+        "name": "Default",
+        "position": [0.0, 0.0, 5.0],
+        "target": [0.0, 0.0, 0.0],
+        "up": [0.0, 1.0, 0.0],
+        "fovYDegrees": 45.0
+      }
+    ],
+    "layout": {
+      "shape": "twoTopOneBottom",
+      "slots": [
+        { "view": "render" },
+        { "view": "editor" },
+        { "view": "console" }
+      ],
+      "sizes": { "primary": 0.75, "secondary": 0.55 },
+      "maximized": null
+    },
+    "timeline": {
+      "firstFrame": 0,
+      "lastFrame": 240,
+      "currentFrame": 0,
+      "targetFps": 60.0
+    }
+  }
+}

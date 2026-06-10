@@ -1,0 +1,69 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+    <!-- Outer warm bloom -->
+    <radialGradient id="bloom-outer" cx="50%" cy="50%" r="50%">
+      <stop offset="0%"  stop-color="#d8a657" stop-opacity="1"/>
+      <stop offset="55%" stop-color="#d8a657" stop-opacity="0.6"/>
+      <stop offset="80%" stop-color="#3a2a14" stop-opacity="0.3"/>
+      <stop offset="100%" stop-color="#0c1015" stop-opacity="0"/>
+    </radialGradient>
+
+    <!-- Mid cyan-gold transition -->
+    <radialGradient id="bloom-mid" cx="50%" cy="50%" r="25%">
+      <stop offset="0%"  stop-color="#7ad3ff" stop-opacity="1"/>
+      <stop offset="40%" stop-color="#7ad3ff" stop-opacity="0.85"/>
+      <stop offset="75%" stop-color="#d8a657" stop-opacity="0.5"/>
+      <stop offset="100%" stop-color="#d8a657" stop-opacity="0"/>
+    </radialGradient>
+
+    <!-- Tight bright core -->
+    <radialGradient id="bloom-core" cx="50%" cy="50%" r="12%">
+      <stop offset="0%"  stop-color="#ffffff" stop-opacity="1"/>
+      <stop offset="35%" stop-color="#ffffff" stop-opacity="0.9"/>
+      <stop offset="65%" stop-color="#7ad3ff" stop-opacity="0.7"/>
+      <stop offset="100%" stop-color="#7ad3ff" stop-opacity="0"/>
+    </radialGradient>
+
+    <!-- Cardinal flare glow -->
+    <filter id="flare-blur" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="8"/>
+    </filter>
+
+    <!-- Diagonal flare glow -->
+    <filter id="flare-blur-diag" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="6"/>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1024" height="1024" fill="#0c1015"/>
+
+  <!-- Outer warm bloom -->
+  <circle cx="512" cy="512" r="440" fill="url(#bloom-outer)"/>
+
+  <!-- Mid bloom -->
+  <circle cx="512" cy="512" r="260" fill="url(#bloom-mid)"/>
+
+  <!-- Core glow -->
+  <circle cx="512" cy="512" r="130" fill="url(#bloom-core)"/>
+
+  <!-- Cardinal flares (soft blurred streaks) -->
+  <g filter="url(#flare-blur)" opacity="0.5">
+    <!-- Horizontal -->
+    <rect x="300" y="505" width="424" height="14" rx="7" fill="#7ad3ff"/>
+    <!-- Vertical -->
+    <rect x="505" y="300" width="14" height="424" rx="7" fill="#7ad3ff"/>
+  </g>
+
+  <!-- Diagonal flares (shorter, dimmer) -->
+  <g filter="url(#flare-blur-diag)" opacity="0.3">
+    <line x1="382" y1="382" x2="642" y2="642" stroke="#7ad3ff" stroke-width="10" stroke-linecap="round"/>
+    <line x1="642" y1="382" x2="382" y2="642" stroke="#7ad3ff" stroke-width="10" stroke-linecap="round"/>
+  </g>
+
+  <!-- The pixel — sharp-edged, on top of everything -->
+  <!-- Outer square (cyan) -->
+  <rect x="482" y="482" width="60" height="60" fill="#7ad3ff"/>
+  <!-- Inner square (white) -->
+  <rect x="492" y="492" width="40" height="40" fill="#ffffff"/>
+</svg>
