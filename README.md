@@ -2,6 +2,8 @@
 
 A local, developer-focused GLSL shader workbench: edit Shadertoy-style GLSL fragment shaders, render in real time, and inspect the result with camera tools, pixel inspector, debug console, and status monitoring.
 
+![Luxel screenshot](docs/screenshot.png)
+
 ## Current Status
 
 Milestone 0 through 6 scaffolding is in place:
