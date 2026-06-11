@@ -22,12 +22,26 @@ const COMPATIBILITY_LABELS: Record<ShaderCompatibility, string> = {
   "raw-fragment-v1": "Raw GLSL (main)",
 };
 
+/// window.confirm is unreliable inside wry/WKWebView — it can silently
+/// return false, which would make confirm-gated paths permanently dead.
+/// Use the native dialog plugin in the desktop shell and fall back to
+/// window.confirm only when running in a plain browser.
+async function confirmDialog(message: string): Promise<boolean> {
+  try {
+    const dialog = await import("@tauri-apps/plugin-dialog");
+    return await dialog.ask(message, {
+      title: "Unsaved changes",
+      kind: "warning",
+    });
+  } catch {
+    return window.confirm(message);
+  }
+}
+
 export default function ShaderEditor() {
   const file = useSceneStore((s) => s.file);
   const dirty = useSceneStore((s) => s.dirty);
   const loadedExampleId = useSceneStore((s) => s.loadedExampleId);
-  const update = useSceneStore((s) => s.updateShaderSource);
-  const setCompatibility = useSceneStore((s) => s.updateShaderCompatibility);
   const replaceFromExample = useSceneStore((s) => s.replaceFromExample);
   const diagnostics = useAppStore((s) => s.shaderDiagnostics);
   const fontSize = useAppStore((s) => s.editorFontSize);
@@ -79,7 +93,7 @@ export default function ShaderEditor() {
   ///      user accepts, drop into the default example for the new mode.
   ///   3. **Saved file or empty scene** (dirty=false, no example) → drop
   ///      into the default example for the new mode silently.
-  function switchCompatibility(target: ShaderCompatibility) {
+  async function switchCompatibility(target: ShaderCompatibility) {
     if (target === currentCompat) return;
 
     // Case 1: an example is loaded and untouched. Find the partner and load
@@ -99,11 +113,11 @@ export default function ShaderEditor() {
 
     // Case 2: unsaved edits — ask before clobbering.
     if (dirty) {
-      const ok = window.confirm(
+      const ok = await confirmDialog(
         "You have unsaved changes to the shader. Switching compatibility " +
           "will replace your code with the default example for " +
           `${COMPATIBILITY_LABELS[target]}. Continue?\n\n` +
-          "Click Cancel to keep your changes and stay in the current mode " +
+          "Choose No to keep your changes and stay in the current mode " +
           "(use Save first if you want to keep your work).",
       );
       if (!ok) return;
@@ -133,13 +147,6 @@ export default function ShaderEditor() {
     };
     replaceFromExample(next, ex.id);
   }
-
-  // Reference unused setters to avoid TS errors after the refactor — the
-  // switchCompatibility path supersedes direct setCompatibility/update
-  // calls from the picker, but tests and other callers might still want
-  // them exposed via the store.
-  void setCompatibility;
-  void update;
 
   return (
     <section className="panel editor-panel">

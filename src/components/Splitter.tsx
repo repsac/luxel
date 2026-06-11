@@ -59,6 +59,14 @@ export default function Splitter({
     [onDragStateChange],
   );
 
+  // pointercancel (OS gesture, window drag) auto-releases capture, and the
+  // pointer id may already be inactive — so only reset the drag state here.
+  const onPointerCancel = useCallback(() => {
+    if (!draggingRef.current) return;
+    draggingRef.current = false;
+    onDragStateChange?.(false);
+  }, [onDragStateChange]);
+
   // Clean up if the component unmounts mid-drag.
   useEffect(() => {
     return () => {
@@ -77,6 +85,7 @@ export default function Splitter({
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
+      onPointerCancel={onPointerCancel}
     />
   );
 }

@@ -2,8 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import { useAppStore } from "../state/appStore";
 import { useSceneStore } from "../state/sceneStore";
 import { useConsoleStore } from "../state/consoleStore";
-import { invoke } from "../tauri/commands";
-import { exportCanvasAsPng, renderScene } from "../actions/render";
+import { formatError, invoke } from "../tauri/commands";
+import { exportCanvasAsPng } from "../actions/render";
 import { EXAMPLES, type ExampleShader } from "../examples";
 import { GIZMO_POC_ENABLED } from "../featureFlags";
 import LayoutMenu from "./LayoutMenu";
@@ -115,24 +115,9 @@ export default function Toolbar() {
       // ---- Cmd/Ctrl modifier shortcuts (always fire) ----
       if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
         e.preventDefault();
-        const f = useSceneStore.getState().file;
-        if (f) {
-          const a = useAppStore.getState();
-          const w = a.previewWidth
-            ? Math.max(16, Math.round(a.previewWidth * a.renderQuality))
-            : undefined;
-          const h = a.previewHeight
-            ? Math.max(16, Math.round(a.previewHeight * a.renderQuality))
-            : undefined;
-          const t = f.scene.timeline;
-          void renderScene({
-            scene: f,
-            time: t.targetFps > 0 ? t.currentFrame / t.targetFps : 0,
-            frame: t.currentFrame,
-            width: w,
-            height: h,
-          });
-        }
+        // Routed through the render driver (which computes size/time the
+        // same way) so manual renders can't race an in-flight driver render.
+        useAppStore.getState().requestRender();
         return;
       }
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "s") {
@@ -236,7 +221,7 @@ export default function Toolbar() {
         timestamp: new Date().toISOString(),
         level: "error",
         source: "scene",
-        message: `new failed: ${String(e)}`,
+        message: `new failed: ${formatError(e)}`,
       });
     }
   }
@@ -273,23 +258,11 @@ export default function Toolbar() {
     setExamplesOpen(false);
   }
 
-  async function render() {
+  function render() {
     if (!file) return;
-    const a = useAppStore.getState();
-    const w = a.previewWidth
-      ? Math.max(16, Math.round(a.previewWidth * a.renderQuality))
-      : undefined;
-    const h = a.previewHeight
-      ? Math.max(16, Math.round(a.previewHeight * a.renderQuality))
-      : undefined;
-    const t = file.scene.timeline;
-    await renderScene({
-      scene: file,
-      time: t.targetFps > 0 ? t.currentFrame / t.targetFps : 0,
-      frame: t.currentFrame,
-      width: w,
-      height: h,
-    });
+    // Routed through the render driver (which computes size/time the same
+    // way) so manual renders can't race an in-flight driver render.
+    useAppStore.getState().requestRender();
   }
 
   async function save() {
@@ -312,7 +285,7 @@ export default function Toolbar() {
         timestamp: new Date().toISOString(),
         level: "error",
         source: "scene",
-        message: `save failed: ${String(e)}`,
+        message: `save failed: ${formatError(e)}`,
       });
     }
   }
@@ -332,7 +305,7 @@ export default function Toolbar() {
         timestamp: new Date().toISOString(),
         level: "error",
         source: "scene",
-        message: `open failed: ${String(e)}`,
+        message: `open failed: ${formatError(e)}`,
       });
     }
   }
@@ -463,6 +436,7 @@ export default function Toolbar() {
       <button
         onClick={toggleFps}
         className={showFps ? "primary" : ""}
+        aria-pressed={showFps}
         title="Toggle the FPS overlay in the render view"
       >
         FPS

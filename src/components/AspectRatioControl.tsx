@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useSceneStore } from "../state/sceneStore";
 import { useAppStore } from "../state/appStore";
 import { parseAspect } from "./aspectMath";
@@ -15,19 +15,31 @@ export default function AspectRatioControl() {
   const setShowFrustumOverlay = useAppStore((s) => s.setShowFrustumOverlay);
   const current = file?.scene.renderSettings.aspectRatio ?? "16:9";
 
+  // Whether the W:H input is shown. Entered by picking "custom…" (which used
+  // to be a no-op — the select just snapped back to the previous preset) or
+  // by the scene carrying a non-preset ratio; exited by picking a preset.
+  const [customMode, setCustomMode] = useState(!PRESETS.includes(current));
   // Custom input mirrors current ratio when it isn't a preset, so the user can
   // tweak the existing value instead of being faced with an empty field.
   const [custom, setCustom] = useState(
     PRESETS.includes(current) ? "" : current,
   );
   const [err, setErr] = useState<string | null>(null);
+  const customInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
-    if (!PRESETS.includes(current) && custom !== current) setCustom(current);
+    if (!PRESETS.includes(current)) {
+      setCustomMode(true);
+      if (custom !== current) setCustom(current);
+    } else {
+      setCustomMode(false);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [current]);
 
   if (!file) return null;
+
+  const inCustom = customMode || !PRESETS.includes(current);
 
   function applyCustom() {
     const parsed = parseAspect(custom);
@@ -43,9 +55,17 @@ export default function AspectRatioControl() {
     <div className="aspect-control">
       <label>Aspect</label>
       <select
-        value={PRESETS.includes(current) ? current : "custom"}
+        value={inCustom ? "custom" : current}
         onChange={(e) => {
-          if (e.target.value !== "custom") update({ aspectRatio: e.target.value });
+          if (e.target.value === "custom") {
+            setCustomMode(true);
+            // Focus after the conditional input mounts.
+            requestAnimationFrame(() => customInputRef.current?.focus());
+          } else {
+            setCustomMode(false);
+            setErr(null);
+            update({ aspectRatio: e.target.value });
+          }
         }}
       >
         {PRESETS.map((p) => (
@@ -55,17 +75,22 @@ export default function AspectRatioControl() {
         ))}
         <option value="custom">custom…</option>
       </select>
-      <input
-        type="text"
-        placeholder="W:H"
-        value={custom}
-        onChange={(e) => setCustom(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === "Enter") applyCustom();
-        }}
-        size={6}
-      />
-      <button onClick={applyCustom}>Set</button>
+      {inCustom && (
+        <>
+          <input
+            ref={customInputRef}
+            type="text"
+            placeholder="W:H"
+            value={custom}
+            onChange={(e) => setCustom(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") applyCustom();
+            }}
+            size={6}
+          />
+          <button onClick={applyCustom}>Set</button>
+        </>
+      )}
       <label className="toggle">
         <input
           type="checkbox"

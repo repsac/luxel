@@ -9,6 +9,12 @@ import { useSceneStore } from "../state/sceneStore";
 
 export default function LayoutMenu() {
   const [open, setOpen] = useState(false);
+  // When non-null, the "+ Save current as…" row is replaced by an inline
+  // name input holding this value. window.prompt is unreliable in
+  // wry/WKWebView (it can silently return null, making save impossible),
+  // so the naming happens in-menu instead.
+  const [savingName, setSavingName] = useState<string | null>(null);
+  const saveInputRef = useRef<HTMLInputElement | null>(null);
   const ref = useRef<HTMLDivElement | null>(null);
   const file = useSceneStore((s) => s.file);
   const setLayout = useSceneStore((s) => s.setLayout);
@@ -21,6 +27,11 @@ export default function LayoutMenu() {
     };
     document.addEventListener("mousedown", onClick);
     return () => document.removeEventListener("mousedown", onClick);
+  }, [open]);
+
+  // Reset the inline save row whenever the menu closes.
+  useEffect(() => {
+    if (!open) setSavingName(null);
   }, [open]);
 
   if (!file) return null;
@@ -36,14 +47,18 @@ export default function LayoutMenu() {
     setOpen(false);
   }
 
-  function saveAsCustom() {
+  function beginSaveAsCustom() {
+    setSavingName(`Layout ${customs.list.length + 1}`);
+    // Focus after the conditional input mounts.
+    requestAnimationFrame(() => saveInputRef.current?.select());
+  }
+
+  function commitSaveAsCustom() {
     if (!file) return;
-    const name = window.prompt(
-      "Save current layout as…",
-      `Layout ${customs.list.length + 1}`,
-    );
+    const name = savingName?.trim();
     if (!name) return;
-    customs.save(name.trim(), file.scene.layout);
+    customs.save(name, file.scene.layout);
+    setSavingName(null);
   }
 
   return (
@@ -87,9 +102,28 @@ export default function LayoutMenu() {
               </button>
             </div>
           ))}
-          <button className="dropdown-item" onClick={saveAsCustom}>
-            + Save current as…
-          </button>
+          {savingName === null ? (
+            <button className="dropdown-item" onClick={beginSaveAsCustom}>
+              + Save current as…
+            </button>
+          ) : (
+            <div className="dropdown-save-row">
+              <input
+                ref={saveInputRef}
+                type="text"
+                value={savingName}
+                onChange={(e) => setSavingName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") commitSaveAsCustom();
+                  if (e.key === "Escape") setSavingName(null);
+                }}
+                aria-label="Layout name"
+              />
+              <button onClick={commitSaveAsCustom} disabled={!savingName.trim()}>
+                Save
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>

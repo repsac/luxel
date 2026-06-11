@@ -20,6 +20,21 @@ async function getInvoke() {
   return cachedInvoke;
 }
 
+/// Normalize an invoke() rejection for display. The Rust side's AppError
+/// serializes as a tagged object ({ kind, message }), which `String(e)`
+/// would render as "[object Object]".
+export function formatError(e: unknown): string {
+  if (e instanceof Error) return e.message;
+  if (typeof e === "object" && e !== null) {
+    const o = e as { kind?: unknown; message?: unknown };
+    if (typeof o.message === "string") {
+      return typeof o.kind === "string" ? `${o.kind}: ${o.message}` : o.message;
+    }
+    return JSON.stringify(e);
+  }
+  return String(e);
+}
+
 export async function invoke<T>(cmd: string, args?: AnyArgs): Promise<T> {
   const fn = await getInvoke();
   if (!fn) {

@@ -116,6 +116,7 @@ pub fn render_single_frame(
     #[allow(non_snake_case)] frameOverride: Option<i32>,
     #[allow(non_snake_case)] widthOverride: Option<u32>,
     #[allow(non_snake_case)] heightOverride: Option<u32>,
+    #[allow(non_snake_case)] mouseOverride: Option<[f32; 4]>,
     state: State<'_, AppState>,
 ) -> Result<Response, AppError> {
     // Apply size overrides on a local copy so we can re-validate dimensions.
@@ -135,7 +136,7 @@ pub fn render_single_frame(
     let inputs = FrameInputs {
         time: timeOverride.unwrap_or(0.0),
         frame: frameOverride.unwrap_or(0),
-        mouse: [0.0; 4],
+        mouse: mouseOverride.unwrap_or([0.0; 4]),
     };
     match renderer.render_single_frame_with(&effective_file.scene, inputs) {
         Ok(r) => {

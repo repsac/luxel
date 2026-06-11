@@ -34,6 +34,10 @@ export default function StatusLine() {
       } catch {
         // Browser fallback: do nothing.
       }
+      // Re-check after the await: if the effect was cleaned up while the
+      // invoke was in flight, rescheduling here would leak a polling chain
+      // that survives unmount.
+      if (cancelled) return;
       timer = window.setTimeout(tick, 1500);
     };
     tick();

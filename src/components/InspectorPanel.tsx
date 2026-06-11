@@ -9,6 +9,7 @@ export default function InspectorPanel() {
   const lastRender = useAppStore((s) => s.lastRender);
   const pixelInspector = useAppStore((s) => s.pixelInspector);
   const pixelInfo = useAppStore((s) => s.pixelInfo);
+  const mouse = useAppStore((s) => s.mouse);
   const fontSize = useAppStore((s) => s.inspectorFontSize);
 
   if (!file) return null;
@@ -34,7 +35,7 @@ export default function InspectorPanel() {
           </Row>
           <Row label="iTime">{iTime.toFixed(4)}</Row>
           <Row label="iFrame">{t.currentFrame}</Row>
-          <Row label="iMouse">0, 0, 0, 0</Row>
+          <Row label="iMouse">{mouse.map((n) => n.toFixed(1)).join(", ")}</Row>
         </InspectorSection>
 
         <InspectorSection title="Camera">

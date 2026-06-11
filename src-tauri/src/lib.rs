@@ -24,8 +24,6 @@ pub fn run() {
         // windows on startup and auto-saves on exit; no JS wiring needed.
         .plugin(tauri_plugin_window_state::Builder::default().build())
         .plugin(tauri_plugin_dialog::init())
-        .plugin(tauri_plugin_fs::init())
-        .plugin(tauri_plugin_shell::init())
         .manage(app_state::AppState::new())
         .invoke_handler(tauri::generate_handler![
             commands::load_scene,

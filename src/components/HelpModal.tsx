@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { FULL_BUILD_LABEL } from "../build-info";
 
 interface Props {
@@ -10,6 +10,8 @@ interface Props {
 /// way around: camera, keyboard shortcuts, layout, and the uniforms a shader
 /// can read. Keep this short — anything detailed lives in the README.
 export default function HelpModal({ open, onClose }: Props) {
+  const panelRef = useRef<HTMLDivElement | null>(null);
+
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
@@ -19,14 +21,38 @@ export default function HelpModal({ open, onClose }: Props) {
     return () => window.removeEventListener("keydown", onKey);
   }, [open, onClose]);
 
+  // Move focus into the dialog on open and back to the trigger on close, so
+  // keyboard users aren't left tabbing through the toolbar underneath.
+  useEffect(() => {
+    if (!open) return;
+    const prev = document.activeElement as HTMLElement | null;
+    panelRef.current?.focus();
+    return () => prev?.focus();
+  }, [open]);
+
   if (!open) return null;
   return (
-    <div className="help-overlay" onClick={onClose}>
-      <div className="help-modal" onClick={(e) => e.stopPropagation()}>
+    <div
+      className="help-overlay"
+      // mousedown (not click) with a target check: a text-selection drag that
+      // starts inside the panel and releases on the overlay dispatches click
+      // on the overlay, which would dismiss the modal mid-selection.
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div
+        ref={panelRef}
+        className="help-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="help-modal-title"
+        tabIndex={-1}
+      >
         <header>
-          <h2>Luxel quick reference</h2>
+          <h2 id="help-modal-title">Luxel quick reference</h2>
           <span className="help-build">{FULL_BUILD_LABEL}</span>
-          <button onClick={onClose}>✕</button>
+          <button onClick={onClose} aria-label="Close">✕</button>
         </header>
         <div className="help-body">
           <section>
@@ -208,7 +234,7 @@ export default function HelpModal({ open, onClose }: Props) {
               {`vec3  iResolution        // viewport size in pixels (x, y, 1)
 float iTime              // currentFrame / targetFps
 int   iFrame             // currentFrame
-vec4  iMouse
+vec4  iMouse             // xy = drag pos, zw = click pos (z<0 when up)
 vec3  iCameraPosition    // world-space camera position
 float iCameraFov         // vertical, radians
 vec3  iCameraForward     // normalized

@@ -44,6 +44,7 @@ export default function RenderView() {
   const togglePixelInspector = useAppStore((s) => s.togglePixelInspector);
   const pixelInfo = useAppStore((s) => s.pixelInfo);
   const setPixelInfo = useAppStore((s) => s.setPixelInfo);
+  const setMouse = useAppStore((s) => s.setMouse);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const [wrapPx, setWrapPx] = useState({ w: 0, h: 0 });
@@ -136,6 +137,19 @@ export default function RenderView() {
     return { x: e.clientX - (rect?.left ?? 0), y: e.clientY - (rect?.top ?? 0) };
   }
 
+  /// Pointer position in render-resolution pixels, bottom-left origin — the
+  /// Shadertoy iMouse coordinate space (same mapping the pixel inspector
+  /// uses). Falls back to the wrap size before the first render lands.
+  function mouseXY(e: React.PointerEvent): [number, number] | null {
+    const rect = wrapRef.current?.getBoundingClientRect();
+    if (!rect || rect.width === 0 || rect.height === 0) return null;
+    const w = lastRender?.width ?? wrapPx.w;
+    const h = lastRender?.height ?? wrapPx.h;
+    const x = ((e.clientX - rect.left) / rect.width) * w;
+    const y = (1 - (e.clientY - rect.top) / rect.height) * h;
+    return [x, y];
+  }
+
   function samplePixel(e: React.PointerEvent | React.MouseEvent) {
     if (!pixelInspector || !lastRender) {
       setPixelInfo(null);
@@ -186,6 +200,12 @@ export default function RenderView() {
       button: e.button,
       shift: e.shiftKey,
     };
+    // Shadertoy iMouse: a left click sets both the drag position (xy) and
+    // the click position (zw, positive while the button is held).
+    if (e.button === 0) {
+      const m = mouseXY(e);
+      if (m) setMouse([m[0], m[1], m[0], m[1]]);
+    }
   }
   function onPointerMove(e: React.PointerEvent) {
     if (!file) return;
@@ -209,6 +229,13 @@ export default function RenderView() {
     const dy = e.clientY - dragRef.current.y;
     dragRef.current.x = e.clientX;
     dragRef.current.y = e.clientY;
+    if (dragRef.current.button === 0) {
+      const m = mouseXY(e);
+      if (m) {
+        const cur = useAppStore.getState().mouse;
+        setMouse([m[0], m[1], cur[2], cur[3]]);
+      }
+    }
     const cam = { ...file.scene.camera };
     if (dragRef.current.button === 1 || dragRef.current.shift) {
       const dist = vecLen(sub(cam.position, cam.target));
@@ -227,7 +254,18 @@ export default function RenderView() {
       setCamera(cam);
     }
   }
+  // Also used for pointercancel: an OS gesture or window drag can interrupt
+  // a drag without ever delivering pointerup, and a stale dragRef would keep
+  // the camera following plain hover until the next click.
   function onPointerUp() {
+    if (dragRef.current?.button === 0) {
+      // Releasing the button flips the click position negative (Shadertoy
+      // convention: shaders test sign(iMouse.z) for "button held").
+      const cur = useAppStore.getState().mouse;
+      if (cur[2] > 0 || cur[3] > 0) {
+        setMouse([cur[0], cur[1], -Math.abs(cur[2]), -Math.abs(cur[3])]);
+      }
+    }
     dragRef.current = null;
     if (gizmoDragRef.current) {
       gizmoDragRef.current = null;
@@ -265,6 +303,7 @@ export default function RenderView() {
           <button
             onClick={toggleGizmo}
             className={gizmoEnabled ? "primary" : ""}
+            aria-pressed={gizmoEnabled}
             title="Toggle the move gizmo — drag the X/Y/Z handles to move the object (iObjectPosition)"
           >
             Move
@@ -281,7 +320,8 @@ export default function RenderView() {
         )}
         <button
           onClick={togglePixelInspector}
-          className={pixelInspector ? "primary" : ""}
+          className={pixelInspector ? "push-right primary" : "push-right"}
+          aria-pressed={pixelInspector}
           title="Toggle pixel inspector — shows resolution, UV, and color under the cursor"
         >
           Inspect
@@ -293,6 +333,7 @@ export default function RenderView() {
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
+        onPointerCancel={onPointerUp}
         onPointerLeave={() => setPixelInfo(null)}
         onWheel={onWheel}
       >
