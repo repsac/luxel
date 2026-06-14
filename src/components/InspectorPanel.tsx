@@ -1,4 +1,5 @@
-import { useAppStore } from "../state/appStore";
+import { useRef } from "react";
+import { useAppStore, type PixelInfo } from "../state/appStore";
 import { useSceneStore } from "../state/sceneStore";
 
 /// Standalone inspector panel for shader debugging. Shows the same pixel
@@ -11,6 +12,15 @@ export default function InspectorPanel() {
   const pixelInfo = useAppStore((s) => s.pixelInfo);
   const mouse = useAppStore((s) => s.mouse);
   const fontSize = useAppStore((s) => s.inspectorFontSize);
+
+  // Retain the last sampled pixel so the four rows stay populated after the
+  // cursor leaves the canvas, instead of collapsing to a hint. `pixelInfo`
+  // is the live value (null when not hovering); `shownPixel` is what we
+  // render.
+  const lastPixelRef = useRef<PixelInfo | null>(null);
+  if (pixelInfo) lastPixelRef.current = pixelInfo;
+  const shownPixel = pixelInfo ?? lastPixelRef.current;
+  const hovering = pixelInfo != null;
 
   if (!file) return null;
 
@@ -51,22 +61,31 @@ export default function InspectorPanel() {
           </Row>
         </InspectorSection>
 
-        <InspectorSection title="Pixel">
-          {pixelInspector && pixelInfo ? (
+        <InspectorSection
+          title="Pixel"
+          aside={
+            !pixelInspector ? (
+              <span className="inspector-hint">Inspect off</span>
+            ) : !hovering ? (
+              <span className="inspector-hint">Hover over render</span>
+            ) : null
+          }
+        >
+          {shownPixel ? (
             <>
               <Row label="Coordinate">
-                {pixelInfo.px}, {pixelInfo.py}
+                {shownPixel.px}, {shownPixel.py}
               </Row>
               <Row label="UV">
-                {pixelInfo.u.toFixed(4)}, {pixelInfo.v.toFixed(4)}
+                {shownPixel.u.toFixed(4)}, {shownPixel.v.toFixed(4)}
               </Row>
               <Row label="RGB">
                 <span className="inspector-rgb">
-                  {pixelInfo.r}, {pixelInfo.g}, {pixelInfo.b}
+                  {shownPixel.r}, {shownPixel.g}, {shownPixel.b}
                   <span
                     className="pi-swatch"
                     style={{
-                      background: `rgb(${pixelInfo.r},${pixelInfo.g},${pixelInfo.b})`,
+                      background: `rgb(${shownPixel.r},${shownPixel.g},${shownPixel.b})`,
                       width: `${fontSize}px`,
                       height: `${fontSize}px`,
                     }}
@@ -74,15 +93,15 @@ export default function InspectorPanel() {
                 </span>
               </Row>
               <Row label="Normalized">
-                {(pixelInfo.r / 255).toFixed(3)},{" "}
-                {(pixelInfo.g / 255).toFixed(3)},{" "}
-                {(pixelInfo.b / 255).toFixed(3)}
+                {(shownPixel.r / 255).toFixed(3)},{" "}
+                {(shownPixel.g / 255).toFixed(3)},{" "}
+                {(shownPixel.b / 255).toFixed(3)}
               </Row>
             </>
           ) : (
             <Row label="">
               {pixelInspector
-                ? "Hover over render"
+                ? "Hover over render to sample"
                 : "Enable Inspect in render view"}
             </Row>
           )}
@@ -106,14 +125,19 @@ export default function InspectorPanel() {
 
 function InspectorSection({
   title,
+  aside,
   children,
 }: {
   title: string;
+  aside?: React.ReactNode;
   children: React.ReactNode;
 }) {
   return (
     <div className="inspector-section">
-      <div className="inspector-section-title">{title}</div>
+      <div className="inspector-section-title">
+        <span>{title}</span>
+        {aside}
+      </div>
       <div className="inspector-rows">{children}</div>
     </div>
   );

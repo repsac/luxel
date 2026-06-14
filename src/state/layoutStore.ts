@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import type {
   LayoutShape,
   LayoutState,
+  SceneFile,
   SlotState,
   ViewId,
 } from "./sceneStore";
@@ -205,6 +206,84 @@ export function deleteCustomLayout(id: string): void {
 
 export function listCustomLayouts(): CustomLayout[] {
   return readCustomLayouts();
+}
+
+// ---------- Default layout ----------
+//
+// The active layout lives in the scene file, so a fresh launch (or "New
+// scene") always resets to the default scene's layout. A user who arranges
+// the panels their way and wants it to stick can pin any layout — preset or
+// custom — as the default; it's stored here and applied to fresh scenes.
+
+const DEFAULT_LAYOUT_KEY = "luxel.defaultLayout";
+
+function isLayoutState(v: unknown): v is LayoutState {
+  return (
+    !!v &&
+    typeof v === "object" &&
+    typeof (v as LayoutState).shape === "string" &&
+    Array.isArray((v as LayoutState).slots)
+  );
+}
+
+export function readDefaultLayout(): LayoutState | null {
+  try {
+    const raw = localStorage.getItem(DEFAULT_LAYOUT_KEY);
+    if (!raw) return null;
+    const parsed: unknown = JSON.parse(raw);
+    return isLayoutState(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+export function writeDefaultLayout(layout: LayoutState | null): void {
+  try {
+    if (layout) localStorage.setItem(DEFAULT_LAYOUT_KEY, JSON.stringify(layout));
+    else localStorage.removeItem(DEFAULT_LAYOUT_KEY);
+  } catch {
+    // Storage may be unavailable in private modes — silently skip.
+  }
+}
+
+/// Return `file` with the pinned default layout applied (slots reshaped to the
+/// layout's shape, never starting maximized). No-op when no default is set.
+/// Used on fresh scenes so applying it doesn't mark the file dirty.
+export function withDefaultLayout(file: SceneFile): SceneFile {
+  const def = readDefaultLayout();
+  if (!def) return file;
+  return {
+    ...file,
+    scene: {
+      ...file.scene,
+      layout: {
+        ...def,
+        slots: reshapeSlots(def.slots, def.shape),
+        maximized: null,
+      },
+    },
+  };
+}
+
+/// React hook for the pinned default layout. `hasDefault` drives the
+/// menu's Set/Clear affordance.
+export function useDefaultLayout(): {
+  hasDefault: boolean;
+  setDefault: (layout: LayoutState) => void;
+  clearDefault: () => void;
+} {
+  const [hasDefault, setHasDefault] = useState(() => readDefaultLayout() !== null);
+  return {
+    hasDefault,
+    setDefault: (layout) => {
+      writeDefaultLayout(layout);
+      setHasDefault(true);
+    },
+    clearDefault: () => {
+      writeDefaultLayout(null);
+      setHasDefault(false);
+    },
+  };
 }
 
 /// React hook variant so components automatically re-render when customs

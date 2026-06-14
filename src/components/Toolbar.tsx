@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import { useAppStore } from "../state/appStore";
-import { useSceneStore } from "../state/sceneStore";
+import { useSceneStore, type SceneFile as SceneFileType } from "../state/sceneStore";
 import { useConsoleStore } from "../state/consoleStore";
 import { formatError, invoke } from "../tauri/commands";
 import { exportCanvasAsPng } from "../actions/render";
+import { saveCurrentScene } from "../actions/scene";
+import { withDefaultLayout } from "../state/layoutStore";
 import { EXAMPLES, type ExampleShader } from "../examples";
 import { GIZMO_POC_ENABLED } from "../featureFlags";
 import LayoutMenu from "./LayoutMenu";
@@ -72,7 +74,6 @@ export default function Toolbar() {
   const path = useSceneStore((s) => s.path);
   const replace = useSceneStore((s) => s.replace);
   const replaceFromExample = useSceneStore((s) => s.replaceFromExample);
-  const markSaved = useSceneStore((s) => s.markSaved);
 
   const renderQuality = useAppStore((s) => s.renderQuality);
   const setRenderQuality = useAppStore((s) => s.setRenderQuality);
@@ -84,6 +85,26 @@ export default function Toolbar() {
 
   const [examplesOpen, setExamplesOpen] = useState(false);
   const examplesRef = useRef<HTMLDivElement | null>(null);
+  // The Save button re-labels to "Save As…" only while Shift is held *and*
+  // the cursor is over the button — so the hint appears exactly where the
+  // gesture applies, not globally whenever Shift is down.
+  const [shiftHeld, setShiftHeld] = useState(false);
+  const [saveHover, setSaveHover] = useState(false);
+
+  useEffect(() => {
+    const onShift = (e: KeyboardEvent) => {
+      if (e.key === "Shift") setShiftHeld(e.type === "keydown");
+    };
+    const onBlur = () => setShiftHeld(false);
+    window.addEventListener("keydown", onShift);
+    window.addEventListener("keyup", onShift);
+    window.addEventListener("blur", onBlur);
+    return () => {
+      window.removeEventListener("keydown", onShift);
+      window.removeEventListener("keyup", onShift);
+      window.removeEventListener("blur", onBlur);
+    };
+  }, []);
 
   useEffect(() => {
     if (!examplesOpen) return;
@@ -112,6 +133,20 @@ export default function Toolbar() {
     const onKey = (e: KeyboardEvent) => {
       const typing = isTypingInForm(e.target as HTMLElement);
 
+      // Toggle the pixel inspector: Cmd+I on macOS, Alt+I on Windows/Linux.
+      // e.code is layout-independent and dodges the dead-key Alt+I produces on
+      // some macOS layouts. The Cmd/Ctrl form fires anywhere; the Alt form is
+      // skipped while typing so it can't swallow an Alt character entry.
+      if (e.code === "KeyI") {
+        const cmd = (e.metaKey || e.ctrlKey) && !e.altKey && !e.shiftKey;
+        const alt = e.altKey && !e.metaKey && !e.ctrlKey && !e.shiftKey;
+        if (cmd || (alt && !typing)) {
+          e.preventDefault();
+          useAppStore.getState().togglePixelInspector();
+          return;
+        }
+      }
+
       // ---- Cmd/Ctrl modifier shortcuts (always fire) ----
       if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
         e.preventDefault();
@@ -122,7 +157,8 @@ export default function Toolbar() {
       }
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "s") {
         e.preventDefault();
-        void save();
+        // Shift forces Save As… (choose a new destination).
+        void save(e.shiftKey);
         return;
       }
       if (e.metaKey || e.ctrlKey) {
@@ -208,8 +244,8 @@ export default function Toolbar() {
 
   async function newScene() {
     try {
-      const fresh = (await invoke("default_scene")) as never;
-      replace(fresh);
+      const fresh = (await invoke("default_scene")) as SceneFileType;
+      replace(withDefaultLayout(fresh));
       append({
         timestamp: new Date().toISOString(),
         level: "info",
@@ -265,29 +301,8 @@ export default function Toolbar() {
     useAppStore.getState().requestRender();
   }
 
-  async function save() {
-    const current = useSceneStore.getState().file;
-    if (!current) return;
-    try {
-      const dialogMod = await import("@tauri-apps/plugin-dialog");
-      let savePath = useSceneStore.getState().path;
-      if (!savePath) {
-        const chosen = await dialogMod.save({
-          filters: [{ name: "Luxel Scene", extensions: ["luxel.json", "json"] }],
-        });
-        if (!chosen) return;
-        savePath = chosen as string;
-      }
-      await invoke("save_scene", { path: savePath, scene: current });
-      markSaved(savePath);
-    } catch (e) {
-      append({
-        timestamp: new Date().toISOString(),
-        level: "error",
-        source: "scene",
-        message: `save failed: ${formatError(e)}`,
-      });
-    }
+  async function save(saveAs = false) {
+    await saveCurrentScene(saveAs);
   }
 
   async function open() {
@@ -299,7 +314,10 @@ export default function Toolbar() {
       });
       if (!chosen || Array.isArray(chosen)) return;
       const loaded = (await invoke("load_scene", { path: chosen })) as never;
-      replace(loaded);
+      // Record the path so the document is recognized as this file: the
+      // toolbar shows its name and a later Save writes back here instead of
+      // prompting for a new destination.
+      replace(loaded, chosen as string);
     } catch (e) {
       append({
         timestamp: new Date().toISOString(),
@@ -371,8 +389,26 @@ export default function Toolbar() {
       <button onClick={open} title="Open a .luxel.json scene">
         Open…
       </button>
-      <button onClick={save} title="Save the current scene (Cmd/Ctrl+S)">
-        {dirty ? "Save*" : "Save"}
+      <button
+        className="save-button"
+        onClick={(e) => save(e.shiftKey)}
+        onMouseEnter={() => setSaveHover(true)}
+        onMouseLeave={() => setSaveHover(false)}
+        title={
+          shiftHeld && saveHover
+            ? "Save As… — choose a new file (Cmd/Ctrl+Shift+S)"
+            : "Save the current scene (Cmd/Ctrl+S; hold Shift for Save As…)"
+        }
+        aria-label={shiftHeld && saveHover ? "Save As" : "Save"}
+      >
+        {/* Hidden sizer reserves the widest label's width so the toolbar
+            doesn't shift when the visible text swaps. */}
+        <span className="save-button-sizer" aria-hidden="true">
+          Save As…
+        </span>
+        <span className="save-button-label">
+          {shiftHeld && saveHover ? "Save As…" : dirty ? "Save*" : "Save"}
+        </span>
       </button>
 
       <div className="dropdown" ref={examplesRef}>

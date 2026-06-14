@@ -44,6 +44,23 @@ a:focus-visible,
   outline-offset: 1px;
 }
 
+/* The Save button swaps its label between "Save"/"Save*" and "Save As…". An
+   overlaid hidden sizer reserves the widest label's width so the toolbar
+   never shifts; the visible label is centered on top of it. */
+.save-button {
+  position: relative;
+}
+.save-button-sizer {
+  visibility: hidden;
+}
+.save-button-label {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
 .loading {
   display: grid;
   place-items: center;
@@ -228,6 +245,16 @@ a:focus-visible,
   display: flex;
   flex-direction: column;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.55);
+}
+/* The unsaved-changes prompt is a small confirmation, not a reference sheet. */
+.help-modal.close-guard {
+  width: min(420px, 90vw);
+}
+.close-guard-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 16px;
 }
 .help-modal > header {
   display: flex;
@@ -737,6 +764,10 @@ a:focus-visible,
   margin-bottom: 12px;
 }
 .inspector-section-title {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
   font-weight: 700;
   color: #7ad3ff;
   text-transform: uppercase;
@@ -744,6 +775,14 @@ a:focus-visible,
   margin-bottom: 4px;
   border-bottom: 1px solid #1a2330;
   padding-bottom: 2px;
+}
+.inspector-hint {
+  font-size: 0.8em;
+  font-style: italic;
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+  color: #7d8a98;
 }
 .inspector-rows {
   padding-left: 8px;

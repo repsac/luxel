@@ -3,6 +3,7 @@ import {
   LAYOUT_PRESETS,
   reshapeSlots,
   useCustomLayouts,
+  useDefaultLayout,
 } from "../state/layoutStore";
 import type { LayoutState } from "../state/sceneStore";
 import { useSceneStore } from "../state/sceneStore";
@@ -19,6 +20,7 @@ export default function LayoutMenu() {
   const file = useSceneStore((s) => s.file);
   const setLayout = useSceneStore((s) => s.setLayout);
   const customs = useCustomLayouts();
+  const defaults = useDefaultLayout();
 
   useEffect(() => {
     if (!open) return;
@@ -123,6 +125,27 @@ export default function LayoutMenu() {
                 Save
               </button>
             </div>
+          )}
+
+          <div className="dropdown-section">Default</div>
+          <button
+            className="dropdown-item"
+            onClick={() => {
+              defaults.setDefault(file.scene.layout);
+              setOpen(false);
+            }}
+            title="Use the current arrangement for new scenes and on startup"
+          >
+            ★ Set current as default
+          </button>
+          {defaults.hasDefault && (
+            <button
+              className="dropdown-item"
+              onClick={() => defaults.clearDefault()}
+              title="New scenes will use the built-in default layout again"
+            >
+              Clear default layout
+            </button>
           )}
         </div>
       )}

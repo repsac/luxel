@@ -2,9 +2,11 @@ import { useEffect } from "react";
 import LayoutRoot from "./components/LayoutRoot";
 import { subscribeConsole } from "./tauri/events";
 import { formatError, invoke } from "./tauri/commands";
-import { useSceneStore } from "./state/sceneStore";
+import { useSceneStore, type SceneFile } from "./state/sceneStore";
 import { useConsoleStore } from "./state/consoleStore";
+import { withDefaultLayout } from "./state/layoutStore";
 import { useRenderDriver } from "./hooks/useRenderDriver";
+import CloseGuard from "./components/CloseGuard";
 
 export default function App() {
   const setScene = useSceneStore((s) => s.replace);
@@ -26,10 +28,16 @@ export default function App() {
       }
       try {
         let loaded: unknown = null;
+        // An explicitly opened scene file carries its own layout, so we only
+        // apply the user's pinned default layout to the fresh default scene.
+        let fromExplicitFile = false;
+        let loadedPath: string | null = null;
         try {
           const initial = (await invoke("initial_scene_path")) as string | null;
           if (initial) {
             loaded = await invoke("load_scene", { path: initial });
+            fromExplicitFile = true;
+            loadedPath = initial;
             append({
               timestamp: new Date().toISOString(),
               level: "info",
@@ -48,7 +56,12 @@ export default function App() {
         if (!loaded) {
           loaded = await invoke("default_scene");
         }
-        if (!cancelled && loaded) setScene(loaded as never);
+        if (!cancelled && loaded) {
+          const file = fromExplicitFile
+            ? (loaded as SceneFile)
+            : withDefaultLayout(loaded as SceneFile);
+          setScene(file, loadedPath);
+        }
       } catch (e) {
         append({
           timestamp: new Date().toISOString(),
@@ -67,5 +80,10 @@ export default function App() {
   // Drive continuous rendering — replaces the old 60ms debounced auto-render.
   useRenderDriver();
 
-  return <LayoutRoot />;
+  return (
+    <>
+      <LayoutRoot />
+      <CloseGuard />
+    </>
+  );
 }
