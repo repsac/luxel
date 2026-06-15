@@ -24,6 +24,7 @@ export function useRenderDriver(): void {
   const previewWidth = useAppStore((s) => s.previewWidth);
   const previewHeight = useAppStore((s) => s.previewHeight);
   const renderQuality = useAppStore((s) => s.renderQuality);
+  const mouse = useAppStore((s) => s.mouse);
 
   const dirtyRef = useRef(true);
   const renderingRef = useRef(false);
@@ -44,6 +45,7 @@ export function useRenderDriver(): void {
     previewWidth,
     previewHeight,
     renderQuality,
+    mouse,
   ]);
 
   useEffect(() => {
@@ -100,10 +102,17 @@ export function useRenderDriver(): void {
         frameAccumulatorRef.current = 0;
       }
 
-      if (!renderingRef.current && dirtyRef.current && (a.autoRender || a.isPlaying)) {
+      // A manual request (Render button / Cmd+Enter) renders even when the
+      // scene isn't dirty and auto-render is off — and by flowing through
+      // this loop it shares the renderingRef serialization instead of racing
+      // an in-flight driver render.
+      const manual = a.renderRequested;
+      const wantsFrame = dirtyRef.current || manual;
+      if (!renderingRef.current && wantsFrame && (a.autoRender || a.isPlaying || manual)) {
         const current = useSceneStore.getState().file;
         const appState = useAppStore.getState();
         if (current && appState.previewWidth > 0 && appState.previewHeight > 0) {
+          if (manual) appState.clearRenderRequest();
           dirtyRef.current = false;
           renderingRef.current = true;
           const w = Math.max(
@@ -130,6 +139,7 @@ export function useRenderDriver(): void {
             frame: iFrame,
             width: w,
             height: h,
+            mouse: appState.mouse,
           }).finally(() => {
             renderingRef.current = false;
           });

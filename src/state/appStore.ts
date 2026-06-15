@@ -69,10 +69,20 @@ interface AppStore {
   /// When true the render driver auto-renders on every change. When false,
   /// rendering only happens on explicit Render button / Cmd+Enter.
   autoRender: boolean;
+  /// One-shot manual render request (Render button / Cmd+Enter). Consumed by
+  /// the render driver so manual renders share its in-flight serialization —
+  /// calling renderScene directly from the UI could race a driver render and
+  /// publish frames out of order.
+  renderRequested: boolean;
   /// Whether the pixel-inspector footer bar is visible in the render view.
   pixelInspector: boolean;
   /// Current pixel data under the cursor (null when not hovering the canvas).
   pixelInfo: PixelInfo | null;
+  /// Shadertoy-convention iMouse, in render-resolution pixels with a
+  /// bottom-left origin: xy = drag position (frozen on release), zw = click
+  /// position, with z/w flipped negative while the button is up. Fed by
+  /// left-drags on the render view.
+  mouse: [number, number, number, number];
   /// Font size used in the inspector panel, in CSS pixels. Persisted via
   /// localStorage so it survives restarts.
   inspectorFontSize: number;
@@ -102,9 +112,12 @@ interface AppStore {
   toggleGizmo: () => void;
   setAutoRender: (on: boolean) => void;
   toggleAutoRender: () => void;
+  requestRender: () => void;
+  clearRenderRequest: () => void;
   setPixelInspector: (on: boolean) => void;
   togglePixelInspector: () => void;
   setPixelInfo: (info: PixelInfo | null) => void;
+  setMouse: (m: [number, number, number, number]) => void;
   setInspectorFontSize: (size: number) => void;
   increaseInspectorFontSize: () => void;
   decreaseInspectorFontSize: () => void;
@@ -212,8 +225,10 @@ export const useAppStore = create<AppStore>((set) => ({
   showFps: readStoredFlag(SHOW_FPS_KEY, false),
   showFrustumOverlay: readStoredFlag(SHOW_FRUSTUM_KEY, false),
   autoRender: readStoredFlag(AUTO_RENDER_KEY, true),
+  renderRequested: false,
   pixelInspector: readStoredFlag(PIXEL_INSPECTOR_KEY, false),
   pixelInfo: null,
+  mouse: [0, 0, 0, 0],
   inspectorFontSize: clampFont(readStoredNumber(INSPECTOR_FONT_KEY, INSPECTOR_FONT_DEFAULT)),
   gizmoEnabled: false,
   editorFontSize: clampFont(readStoredNumber(EDITOR_FONT_KEY, EDITOR_FONT_DEFAULT)),
@@ -282,6 +297,8 @@ export const useAppStore = create<AppStore>((set) => ({
       writeStoredFlag(AUTO_RENDER_KEY, next);
       return { autoRender: next };
     }),
+  requestRender: () => set({ renderRequested: true }),
+  clearRenderRequest: () => set({ renderRequested: false }),
   setPixelInspector: (on) => {
     writeStoredFlag(PIXEL_INSPECTOR_KEY, on);
     set({ pixelInspector: on });
@@ -293,6 +310,7 @@ export const useAppStore = create<AppStore>((set) => ({
       return { pixelInspector: next };
     }),
   setPixelInfo: (info) => set({ pixelInfo: info }),
+  setMouse: (m) => set({ mouse: m }),
   setInspectorFontSize: (size) =>
     set(() => {
       const next = clampFont(size);

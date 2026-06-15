@@ -95,6 +95,7 @@ export default function PlaybackBar() {
         <button
           onClick={() => togglePlay(-1)}
           className={playBwdActive ? "primary" : ""}
+          aria-pressed={playBwdActive}
           title="Play backward (Shift+Space)"
           aria-label="Play backward"
         >
@@ -103,6 +104,7 @@ export default function PlaybackBar() {
         <button
           onClick={() => togglePlay(1)}
           className={playFwdActive ? "primary" : ""}
+          aria-pressed={playFwdActive}
           title="Play forward (Space)"
           aria-label="Play forward"
         >
@@ -121,6 +123,7 @@ export default function PlaybackBar() {
         <button
           onClick={toggleLoopPlayback}
           className={loopPlayback ? "primary" : ""}
+          aria-pressed={loopPlayback}
           title="Loop playback — wrap around at timeline bounds"
           aria-label="Toggle loop"
         >

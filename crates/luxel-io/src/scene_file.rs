@@ -89,4 +89,30 @@ mod tests {
         let loaded = load_scene_file(&path).unwrap();
         assert_eq!(f, loaded);
     }
+
+    #[test]
+    fn round_trip_preserves_customized_layout() {
+        // A scene carries its own panel layout, so a user with a specific
+        // arrangement for a specific scene gets it back on reopen — without
+        // saving it as a global preset. Guard the full layout (shape, slot
+        // views, splitter sizes, and maximized slot) through the disk path.
+        use luxel_core::{LayoutShape, LayoutState, SlotState, ViewId};
+        let mut f = SceneFile::default();
+        f.scene.layout = LayoutState {
+            shape: LayoutShape::ThreeAcross,
+            slots: vec![
+                SlotState::new(ViewId::Inspector),
+                SlotState::new(ViewId::Editor),
+                SlotState::new(ViewId::Render),
+            ],
+            sizes: luxel_core::LayoutSizes {
+                primary: 0.33,
+                secondary: 0.6,
+            },
+            maximized: Some(2),
+        };
+        let text = serialize_scene_file(&f).unwrap();
+        let f2 = parse_scene_file(&text).unwrap();
+        assert_eq!(f2.scene.layout, f.scene.layout);
+    }
 }

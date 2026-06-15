@@ -113,7 +113,11 @@ interface SceneStore {
   /// null. Used by the compatibility picker to decide whether it can
   /// auto-swap to the paired example in the other mode.
   loadedExampleId: string | null;
-  replace: (file: SceneFile) => void;
+  /// Adopt a scene as the current document. Pass `path` when it came from a
+  /// real file on disk (an Open or an initial-scene load) so subsequent saves
+  /// write back to that file instead of prompting for a name; omit it for new
+  /// or default scenes, which resets any stale path from a prior document.
+  replace: (file: SceneFile, path?: string | null) => void;
   /// Replace the scene from a built-in example load. Same as `replace`
   /// but also records the example id and clears dirty.
   replaceFromExample: (file: SceneFile, exampleId: string) => void;
@@ -145,7 +149,8 @@ export const useSceneStore = create<SceneStore>((set) => ({
   dirty: false,
   path: null,
   loadedExampleId: null,
-  replace: (file) => set({ file, dirty: false, loadedExampleId: null }),
+  replace: (file, path = null) =>
+    set({ file, path, dirty: false, loadedExampleId: null }),
   replaceFromExample: (file, exampleId) =>
     set({ file, dirty: false, loadedExampleId: exampleId, path: null }),
   updateShaderSource: (source) =>

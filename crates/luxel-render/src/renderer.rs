@@ -5,7 +5,7 @@
 
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
-use std::sync::Mutex;
+use std::sync::{Mutex, MutexGuard, PoisonError};
 use std::time::Instant;
 
 use bytemuck::{Pod, Zeroable};
@@ -95,6 +95,21 @@ struct ShaderUniforms {
 }
 
 const COPY_ROW_ALIGN: u32 = wgpu::COPY_BYTES_PER_ROW_ALIGNMENT;
+
+/// Recover the guard from a poisoned lock instead of panicking. The caches
+/// hold plain GPU handles with no invariants a panicking thread could have
+/// half-applied, and propagating the poison would otherwise turn one failed
+/// render into a permanent "every render panics" state for the process.
+fn lock_unpoisoned<T>(m: &Mutex<T>) -> MutexGuard<'_, T> {
+    m.lock().unwrap_or_else(PoisonError::into_inner)
+}
+
+/// Offscreen target format. Deliberately NOT the sRGB variant: Shadertoy
+/// renders to a non-sRGB WebGL canvas, so shader output bytes are stored
+/// verbatim and shaders apply their own gamma. An `Rgba8UnormSrgb` target
+/// would add a second linear→sRGB encode on store and wash out every
+/// ported shader.
+const TARGET_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba8Unorm;
 
 pub struct Renderer {
     device: wgpu::Device,
@@ -206,8 +221,8 @@ impl Renderer {
                 usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
             });
 
-        let format = wgpu::TextureFormat::Rgba8UnormSrgb;
-        let cache_guard = self.pipeline_cache.lock().expect("pipeline cache poisoned");
+        let format = TARGET_FORMAT;
+        let cache_guard = lock_unpoisoned(&self.pipeline_cache);
         let entry = cache_guard
             .as_ref()
             .expect("pipeline must be initialized by ensure_pipeline");
@@ -222,8 +237,8 @@ impl Renderer {
             }],
         });
 
-        self.ensure_targets(width, height, format);
-        let targets_guard = self.targets_cache.lock().expect("targets cache poisoned");
+        self.ensure_targets(width, height, format)?;
+        let targets_guard = lock_unpoisoned(&self.targets_cache);
         let targets = targets_guard
             .as_ref()
             .expect("targets must be initialized by ensure_targets");
@@ -313,11 +328,35 @@ impl Renderer {
     }
 
     /// Build or reuse the cached render target + readback buffer for this size.
-    fn ensure_targets(&self, width: u32, height: u32, format: wgpu::TextureFormat) {
-        let mut guard = self.targets_cache.lock().expect("targets cache poisoned");
+    ///
+    /// Validates the size against the actual device limits first: scene files
+    /// can request dimensions the scene-level validator accepts but the device
+    /// cannot service, and letting that reach `create_texture`/`create_buffer`
+    /// raises an uncaptured wgpu error, which panics by default.
+    fn ensure_targets(
+        &self,
+        width: u32,
+        height: u32,
+        format: wgpu::TextureFormat,
+    ) -> Result<(), RenderError> {
+        let limits = self.device.limits();
+        let max_dim = limits.max_texture_dimension_2d;
+        if width > max_dim || height > max_dim {
+            return Err(RenderError::TargetTooLarge(format!(
+                "{width}x{height} exceeds this device's max texture dimension ({max_dim})"
+            )));
+        }
+        let needed = align_up(4 * width, COPY_ROW_ALIGN) as u64 * height as u64;
+        if needed > limits.max_buffer_size {
+            return Err(RenderError::TargetTooLarge(format!(
+                "{width}x{height} needs a {needed}-byte readback buffer; device max is {}",
+                limits.max_buffer_size
+            )));
+        }
+        let mut guard = lock_unpoisoned(&self.targets_cache);
         if let Some(t) = guard.as_ref() {
             if t.width == width && t.height == height {
-                return;
+                return Ok(());
             }
         }
         let target = self.device.create_texture(&wgpu::TextureDescriptor {
@@ -352,11 +391,12 @@ impl Renderer {
             readback,
             padded_bpr,
         });
+        Ok(())
     }
 
     /// Build or reuse the cached pipeline for this shader source.
     fn ensure_pipeline(&self, key: u64, src: &ShaderSource) -> Result<(), RenderError> {
-        let mut guard = self.pipeline_cache.lock().expect("pipeline cache poisoned");
+        let mut guard = lock_unpoisoned(&self.pipeline_cache);
         if guard.as_ref().map(|(k, _)| *k) == Some(key) {
             return Ok(());
         }
@@ -404,7 +444,7 @@ impl Renderer {
                     bind_group_layouts: &[&bgl],
                     push_constant_ranges: &[],
                 });
-        let format = wgpu::TextureFormat::Rgba8UnormSrgb;
+        let format = TARGET_FORMAT;
         let pipeline = self
             .device
             .create_render_pipeline(&wgpu::RenderPipelineDescriptor {

@@ -2,7 +2,7 @@
 // keyboard shortcut.
 
 import type { SceneFile } from "../state/sceneStore";
-import { invoke } from "../tauri/commands";
+import { formatError, invoke } from "../tauri/commands";
 import { useAppStore } from "../state/appStore";
 import { useConsoleStore } from "../state/consoleStore";
 
@@ -12,6 +12,9 @@ export interface RenderRequest {
   frame?: number;
   width?: number;
   height?: number;
+  /// Shadertoy-convention iMouse (render-resolution pixels, bottom-left
+  /// origin). Defaults to all zeros on the Rust side when omitted.
+  mouse?: [number, number, number, number];
   isCurrent?: () => boolean;
 }
 
@@ -79,6 +82,7 @@ export async function renderScene(req: RenderRequest): Promise<void> {
     if (req.frame !== undefined) args.frameOverride = req.frame;
     if (req.width !== undefined) args.widthOverride = req.width;
     if (req.height !== undefined) args.heightOverride = req.height;
+    if (req.mouse !== undefined) args.mouseOverride = req.mouse;
     const raw = await invoke<ArrayBuffer>("render_single_frame", args);
     if (req.isCurrent && !req.isCurrent()) return;
     const decoded = decodeRenderPayload(raw);
@@ -101,7 +105,7 @@ export async function renderScene(req: RenderRequest): Promise<void> {
       timestamp: new Date().toISOString(),
       level: "error",
       source: "renderer",
-      message: `render failed: ${String(e)}`,
+      message: `render failed: ${formatError(e)}`,
     });
   }
 }

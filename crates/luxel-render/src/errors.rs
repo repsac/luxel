@@ -24,6 +24,8 @@ pub enum RenderError {
     ShaderCompile(#[from] ShaderCompileError),
     #[error("readback failed: {0}")]
     Readback(String),
+    #[error("render target too large: {0}")]
+    TargetTooLarge(String),
     #[error("surface error: {0}")]
     Surface(String),
 }
