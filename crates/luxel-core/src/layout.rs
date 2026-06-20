@@ -8,6 +8,7 @@ pub enum ViewId {
     Editor,
     Console,
     Inspector,
+    Scratchpad,
     Empty,
 }
 

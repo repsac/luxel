@@ -154,6 +154,7 @@ export const VIEW_LABELS: Record<ViewId, string> = {
   editor: "Editor",
   console: "Console",
   inspector: "Inspector",
+  scratchpad: "Scratchpad",
   empty: "Empty",
 };
 

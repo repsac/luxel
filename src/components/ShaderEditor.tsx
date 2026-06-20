@@ -3,7 +3,7 @@ import { cpp } from "@codemirror/lang-cpp";
 import { linter, type Diagnostic } from "@codemirror/lint";
 import { EditorView } from "@codemirror/view";
 import { useSceneStore, type ShaderCompatibility } from "../state/sceneStore";
-import { useAppStore } from "../state/appStore";
+import { fontSizeForView, useAppStore } from "../state/appStore";
 import {
   defaultExampleFor,
   findExample,
@@ -44,10 +44,12 @@ export default function ShaderEditor() {
   const loadedExampleId = useSceneStore((s) => s.loadedExampleId);
   const replaceFromExample = useSceneStore((s) => s.replaceFromExample);
   const diagnostics = useAppStore((s) => s.shaderDiagnostics);
-  const fontSize = useAppStore((s) => s.editorFontSize);
-  const zoomIn = useAppStore((s) => s.increaseEditorFontSize);
-  const zoomOut = useAppStore((s) => s.decreaseEditorFontSize);
-  const zoomReset = useAppStore((s) => s.resetEditorFontSize);
+  const fontSize = useAppStore((s) => fontSizeForView(s.viewFontSizes, "editor"));
+  const adjustFont = useAppStore((s) => s.adjustViewFontSize);
+  const resetFont = useAppStore((s) => s.resetViewFontSize);
+  const zoomIn = () => adjustFont("editor", 1);
+  const zoomOut = () => adjustFont("editor", -1);
+  const zoomReset = () => resetFont("editor");
 
   const lintExt = useMemo(
     () =>
@@ -158,7 +160,7 @@ export default function ShaderEditor() {
           onChange={(e) =>
             switchCompatibility(e.target.value as ShaderCompatibility)
           }
-          title="Compatibility mode — switches which entry point the prelude expects"
+          title="Compatibility mode: switches which entry point the prelude expects (mainImage vs main)"
         >
           {(Object.keys(COMPATIBILITY_LABELS) as ShaderCompatibility[]).map((id) => (
             <option key={id} value={id}>
@@ -172,7 +174,7 @@ export default function ShaderEditor() {
           </button>
           <button
             onClick={zoomReset}
-            title={`Reset zoom (Cmd/Ctrl 0) — currently ${fontSize}px`}
+            title={`Reset editor zoom to default (Cmd/Ctrl 0). Currently ${fontSize}px.`}
             aria-label="Reset zoom"
           >
             <MagnifierReset />

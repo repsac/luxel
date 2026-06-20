@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useAppStore } from "../state/appStore";
+import { isFontScalable, useAppStore } from "../state/appStore";
 import { useSceneStore, type SceneFile as SceneFileType } from "../state/sceneStore";
 import { useConsoleStore } from "../state/consoleStore";
 import { formatError, invoke } from "../tauri/commands";
@@ -162,30 +162,20 @@ export default function Toolbar() {
         return;
       }
       if (e.metaKey || e.ctrlKey) {
-        // Shift+Cmd/Ctrl +/- scales the inspector font; plain Cmd/Ctrl +/- scales the editor.
-        if (e.shiftKey && (e.key === "=" || e.key === "+")) {
+        // Font scaling (Cmd/Ctrl +/-/0) applies to the view under the cursor,
+        // so one shortcut scales whichever panel you're looking at. We still
+        // preventDefault when no scalable view is hovered, so the webview's
+        // own zoom doesn't kick in.
+        if (e.key === "=" || e.key === "+" || e.key === "-" || e.key === "_" || e.key === "0") {
           e.preventDefault();
-          useAppStore.getState().increaseInspectorFontSize();
-          return;
-        }
-        if (e.shiftKey && (e.key === "-" || e.key === "_")) {
-          e.preventDefault();
-          useAppStore.getState().decreaseInspectorFontSize();
-          return;
-        }
-        if (e.key === "=" || e.key === "+") {
-          e.preventDefault();
-          useAppStore.getState().increaseEditorFontSize();
-          return;
-        }
-        if (e.key === "-" || e.key === "_") {
-          e.preventDefault();
-          useAppStore.getState().decreaseEditorFontSize();
-          return;
-        }
-        if (e.key === "0") {
-          e.preventDefault();
-          useAppStore.getState().resetEditorFontSize();
+          const view = useAppStore.getState().hoveredView;
+          if (isFontScalable(view)) {
+            if (e.key === "0") useAppStore.getState().resetViewFontSize(view);
+            else {
+              const delta = e.key === "-" || e.key === "_" ? -1 : 1;
+              useAppStore.getState().adjustViewFontSize(view, delta);
+            }
+          }
           return;
         }
         // Cmd/Ctrl + Left/Right = jump to first/last frame, but only when

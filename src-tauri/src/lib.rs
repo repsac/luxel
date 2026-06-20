@@ -33,6 +33,7 @@ pub fn run() {
             commands::initial_scene_path,
             commands::compile_shader,
             commands::render_single_frame,
+            commands::eval_glsl,
             commands::get_system_status,
             commands::get_gpu_info,
             commands::set_gpu_backend,

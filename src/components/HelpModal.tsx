@@ -185,6 +185,64 @@ export default function HelpModal({ open, onClose }: Props) {
             </p>
           </section>
           <section>
+            <h3>Scratchpad</h3>
+            <p>
+              The Scratchpad evaluates a single GLSL expression at one pixel and
+              prints its value, like a REPL for shader math. Set the pixel (and
+              optionally override <code>iTime</code>) in its header; the pixel is
+              shared with the Inspector and the render-view crosshair. All the
+              scene uniforms (<code>iResolution</code>, <code>iTime</code>, the
+              camera, ...) and <code>gl_FragCoord</code> are available.
+            </p>
+            <table>
+              <tbody>
+                <tr>
+                  <td>
+                    <code>length(vec2(3.0, 4.0))</code>
+                  </td>
+                  <td>Try a built-in on any value</td>
+                </tr>
+                <tr>
+                  <td>
+                    <code>(gl_FragCoord.xy - 0.5 * iResolution.xy) / iResolution.y</code>
+                  </td>
+                  <td>See what the math gives at the pinned pixel</td>
+                </tr>
+                <tr>
+                  <td>
+                    <code>a = vec2(3.0, 4.0)</code>
+                  </td>
+                  <td>Store a value and reuse it on later lines</td>
+                </tr>
+                <tr>
+                  <td>
+                    <kbd>Tab</kbd>
+                  </td>
+                  <td>
+                    Autocomplete built-ins, uniforms, variables, and swizzles
+                    (type <code>.</code> after a vector)
+                  </td>
+                </tr>
+                <tr>
+                  <td>
+                    <kbd>↑</kbd> / <kbd>↓</kbd>
+                  </td>
+                  <td>Move the suggestion list, or walk expression history</td>
+                </tr>
+                <tr>
+                  <td>
+                    <code>:builtins</code> · <code>:help</code> ·{" "}
+                    <code>:vars</code> · <code>:reset</code> · <code>:clear</code>
+                  </td>
+                  <td>
+                    List built-ins, help (or <code>:help mix</code>), list/clear
+                    variables, clear scrollback
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </section>
+          <section>
             <h3>Shader compatibility modes</h3>
             <p>
               The compatibility dropdown in the editor header picks how your

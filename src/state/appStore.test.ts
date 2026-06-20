@@ -1,53 +1,83 @@
 import { beforeEach, describe, it, expect } from "vitest";
 import {
   computeFps,
-  EDITOR_FONT_DEFAULT,
-  EDITOR_FONT_MAX,
-  EDITOR_FONT_MIN,
+  FONT_DEFAULTS,
+  FONT_MAX,
+  FONT_MIN,
+  fontSizeForView,
+  isFontScalable,
   useAppStore,
 } from "./appStore";
 
-describe("editor font-size actions", () => {
+const sizeOf = (view: "editor" | "inspector" | "console") =>
+  fontSizeForView(useAppStore.getState().viewFontSizes, view);
+
+describe("per-view font-size actions", () => {
   beforeEach(() => {
-    useAppStore.getState().resetEditorFontSize();
+    useAppStore.getState().resetViewFontSize("editor");
+    useAppStore.getState().resetViewFontSize("inspector");
+    useAppStore.getState().resetViewFontSize("console");
   });
 
-  it("starts at the default size", () => {
-    expect(useAppStore.getState().editorFontSize).toBe(EDITOR_FONT_DEFAULT);
+  it("each view starts at its own default size", () => {
+    expect(sizeOf("editor")).toBe(FONT_DEFAULTS.editor);
+    expect(sizeOf("inspector")).toBe(FONT_DEFAULTS.inspector);
+    expect(sizeOf("console")).toBe(FONT_DEFAULTS.console);
   });
 
-  it("increase steps up by 1 and caps at EDITOR_FONT_MAX", () => {
-    const start = useAppStore.getState().editorFontSize;
-    useAppStore.getState().increaseEditorFontSize();
-    expect(useAppStore.getState().editorFontSize).toBe(start + 1);
-    for (let i = 0; i < 100; i++) useAppStore.getState().increaseEditorFontSize();
-    expect(useAppStore.getState().editorFontSize).toBe(EDITOR_FONT_MAX);
+  it("adjust steps by the delta and caps at FONT_MAX", () => {
+    const start = sizeOf("editor");
+    useAppStore.getState().adjustViewFontSize("editor", 1);
+    expect(sizeOf("editor")).toBe(start + 1);
+    for (let i = 0; i < 100; i++) useAppStore.getState().adjustViewFontSize("editor", 1);
+    expect(sizeOf("editor")).toBe(FONT_MAX);
   });
 
-  it("decrease steps down by 1 and floors at EDITOR_FONT_MIN", () => {
-    for (let i = 0; i < 100; i++) useAppStore.getState().decreaseEditorFontSize();
-    expect(useAppStore.getState().editorFontSize).toBe(EDITOR_FONT_MIN);
+  it("adjust floors at FONT_MIN", () => {
+    for (let i = 0; i < 100; i++) useAppStore.getState().adjustViewFontSize("editor", -1);
+    expect(sizeOf("editor")).toBe(FONT_MIN);
   });
 
-  it("reset returns to the default after zooming", () => {
-    useAppStore.getState().increaseEditorFontSize();
-    useAppStore.getState().increaseEditorFontSize();
-    useAppStore.getState().resetEditorFontSize();
-    expect(useAppStore.getState().editorFontSize).toBe(EDITOR_FONT_DEFAULT);
+  it("reset returns a view to its default after zooming", () => {
+    useAppStore.getState().adjustViewFontSize("inspector", 3);
+    useAppStore.getState().resetViewFontSize("inspector");
+    expect(sizeOf("inspector")).toBe(FONT_DEFAULTS.inspector);
   });
 
-  it("setEditorFontSize clamps non-finite input to the default", () => {
-    useAppStore.getState().setEditorFontSize(Number.NaN);
-    expect(useAppStore.getState().editorFontSize).toBe(EDITOR_FONT_DEFAULT);
+  it("views are scaled independently", () => {
+    useAppStore.getState().adjustViewFontSize("editor", 2);
+    expect(sizeOf("editor")).toBe((FONT_DEFAULTS.editor ?? 0) + 2);
+    expect(sizeOf("inspector")).toBe(FONT_DEFAULTS.inspector);
+    expect(sizeOf("console")).toBe(FONT_DEFAULTS.console);
   });
 
-  it("setEditorFontSize rounds fractional input and clamps to the legal range", () => {
-    useAppStore.getState().setEditorFontSize(15.4);
-    expect(useAppStore.getState().editorFontSize).toBe(15);
-    useAppStore.getState().setEditorFontSize(EDITOR_FONT_MAX + 50);
-    expect(useAppStore.getState().editorFontSize).toBe(EDITOR_FONT_MAX);
-    useAppStore.getState().setEditorFontSize(EDITOR_FONT_MIN - 50);
-    expect(useAppStore.getState().editorFontSize).toBe(EDITOR_FONT_MIN);
+  it("setViewFontSize clamps non-finite input and rounds fractional input", () => {
+    useAppStore.getState().setViewFontSize("editor", Number.NaN);
+    expect(sizeOf("editor")).toBe(13); // generic fallback for NaN
+    useAppStore.getState().setViewFontSize("editor", 15.4);
+    expect(sizeOf("editor")).toBe(15);
+    useAppStore.getState().setViewFontSize("editor", FONT_MAX + 50);
+    expect(sizeOf("editor")).toBe(FONT_MAX);
+    useAppStore.getState().setViewFontSize("editor", FONT_MIN - 50);
+    expect(sizeOf("editor")).toBe(FONT_MIN);
+  });
+});
+
+describe("font scalability + hovered view", () => {
+  it("only views in FONT_DEFAULTS are scalable", () => {
+    expect(isFontScalable("editor")).toBe(true);
+    expect(isFontScalable("inspector")).toBe(true);
+    expect(isFontScalable("console")).toBe(true);
+    expect(isFontScalable("render")).toBe(false);
+    expect(isFontScalable("empty")).toBe(false);
+    expect(isFontScalable(null)).toBe(false);
+  });
+
+  it("tracks the hovered view", () => {
+    useAppStore.getState().setHoveredView("console");
+    expect(useAppStore.getState().hoveredView).toBe("console");
+    useAppStore.getState().setHoveredView(null);
+    expect(useAppStore.getState().hoveredView).toBeNull();
   });
 });
 

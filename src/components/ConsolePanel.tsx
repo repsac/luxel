@@ -1,5 +1,6 @@
 import { useConsoleStore, visibleEvents } from "../state/consoleStore";
 import type { LogLevel } from "../state/consoleStore";
+import { fontSizeForView, useAppStore } from "../state/appStore";
 
 const LEVELS: LogLevel[] = ["debug", "info", "warn", "error"];
 
@@ -8,6 +9,7 @@ export default function ConsolePanel() {
   const filter = useConsoleStore((s) => s.filterLevel);
   const clear = useConsoleStore((s) => s.clear);
   const setFilter = useConsoleStore((s) => s.setFilter);
+  const fontSize = useAppStore((s) => fontSizeForView(s.viewFontSizes, "console"));
   const list = visibleEvents(events, filter);
 
   return (
@@ -26,9 +28,11 @@ export default function ConsolePanel() {
             </label>
           ))}
         </div>
-        <button onClick={clear}>Clear</button>
+        <button onClick={clear} title="Clear all console messages">
+          Clear
+        </button>
       </header>
-      <ol className="console-list">
+      <ol className="console-list" style={{ fontSize: `${fontSize}px` }}>
         {list.map((e, i) => (
           <li key={i} className={`level-${e.level}`}>
             <time>{e.timestamp.slice(11, 19)}</time>

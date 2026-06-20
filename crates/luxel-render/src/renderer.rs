@@ -175,6 +175,16 @@ impl Renderer {
         &self.gpu_info
     }
 
+    /// Device/queue access for sibling modules in this crate (e.g. the
+    /// expression evaluator), which need to build their own throwaway
+    /// pipelines without exposing the handles publicly.
+    pub(crate) fn device(&self) -> &wgpu::Device {
+        &self.device
+    }
+    pub(crate) fn queue(&self) -> &wgpu::Queue {
+        &self.queue
+    }
+
     /// Render a single frame for the given scene and return RGBA8 pixels (base64-encoded).
     pub fn render_single_frame(&self, scene: &Scene) -> Result<RenderResult, RenderError> {
         self.render_single_frame_with(scene, FrameInputs::default())
@@ -481,14 +491,14 @@ impl Renderer {
 }
 
 /// Right-handed orthonormal basis derived from a camera's position/target/up.
-struct CameraBasis {
-    forward: [f32; 3],
-    right: [f32; 3],
-    up: [f32; 3],
+pub(crate) struct CameraBasis {
+    pub forward: [f32; 3],
+    pub right: [f32; 3],
+    pub up: [f32; 3],
 }
 
 impl CameraBasis {
-    fn from(cam: &luxel_core::CameraState) -> Self {
+    pub(crate) fn from(cam: &luxel_core::CameraState) -> Self {
         let f = normalize(sub(cam.target, cam.position));
         let up_in = normalize(cam.up);
         let mut r = normalize(cross(f, up_in));
@@ -535,7 +545,7 @@ fn shader_key(src: &ShaderSource) -> u64 {
     h.finish()
 }
 
-fn align_up(value: u32, align: u32) -> u32 {
+pub(crate) fn align_up(value: u32, align: u32) -> u32 {
     (value + align - 1) / align * align
 }
 
