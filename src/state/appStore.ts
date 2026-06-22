@@ -89,6 +89,10 @@ interface AppStore {
   /// and the render view marks it with a crosshair. Preserved across canvas
   /// resizes; only its derived display reacts when it falls out of bounds.
   pinnedPixel: { x: number; y: number } | null;
+  /// The pixel under the cursor in the render view (bottom-left index), tracked
+  /// regardless of the Inspect toggle so the "pin hovered pixel" hotkey can
+  /// grab it. Null when the cursor is off the canvas.
+  hoverPixel: { x: number; y: number } | null;
   /// Whether to draw the crosshair marker over the pinned pixel.
   showCrosshair: boolean;
   /// Per-view text size in CSS pixels, keyed by view. Only views in
@@ -129,6 +133,7 @@ interface AppStore {
   setPixelInfo: (info: PixelInfo | null) => void;
   setMouse: (m: [number, number, number, number]) => void;
   setPinnedPixel: (p: { x: number; y: number } | null) => void;
+  setHoverPixel: (p: { x: number; y: number } | null) => void;
   setShowCrosshair: (on: boolean) => void;
   toggleCrosshair: () => void;
   setHoveredView: (view: ViewId | null) => void;
@@ -293,6 +298,7 @@ export const useAppStore = create<AppStore>((set) => ({
   pixelInfo: null,
   mouse: [0, 0, 0, 0],
   pinnedPixel: null,
+  hoverPixel: null,
   showCrosshair: false,
   viewFontSizes: readViewFontSizes(),
   hoveredView: null,
@@ -369,6 +375,7 @@ export const useAppStore = create<AppStore>((set) => ({
   setPixelInfo: (info) => set({ pixelInfo: info }),
   setMouse: (m) => set({ mouse: m }),
   setPinnedPixel: (p) => set({ pinnedPixel: p }),
+  setHoverPixel: (p) => set({ hoverPixel: p }),
   setShowCrosshair: (on) => set({ showCrosshair: on }),
   toggleCrosshair: () => set((s) => ({ showCrosshair: !s.showCrosshair })),
   setHoveredView: (view) => set({ hoveredView: view }),

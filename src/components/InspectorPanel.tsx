@@ -133,8 +133,11 @@ export default function InspectorPanel() {
             </Row>
           ) : shownPixel ? (
             <>
-              <Row label="Coordinate">
+              <Row label="Pixel">
                 {shownPixel.px}, {shownPixel.py}
+              </Row>
+              <Row label="FragCoord">
+                {(shownPixel.px + 0.5).toFixed(1)}, {(shownPixel.py + 0.5).toFixed(1)}
               </Row>
               <Row label="UV">
                 {shownPixel.u.toFixed(4)}, {shownPixel.v.toFixed(4)}

@@ -45,6 +45,7 @@ export default function RenderView() {
   const togglePixelInspector = useAppStore((s) => s.togglePixelInspector);
   const pixelInfo = useAppStore((s) => s.pixelInfo);
   const setPixelInfo = useAppStore((s) => s.setPixelInfo);
+  const setHoverPixel = useAppStore((s) => s.setHoverPixel);
   const setMouse = useAppStore((s) => s.setMouse);
   const pinnedPixel = useAppStore((s) => s.pinnedPixel);
   const showCrosshair = useAppStore((s) => s.showCrosshair);
@@ -170,20 +171,41 @@ export default function RenderView() {
     return [x, y];
   }
 
-  function samplePixel(e: React.PointerEvent | React.MouseEvent) {
-    if (!pixelInspector || !lastRender) {
-      setPixelInfo(null);
-      return;
-    }
+  /// Pointer position as a bottom-left render-pixel index, or null when off
+  /// the canvas / before the first render.
+  function pixelAtPointer(e: React.PointerEvent | React.MouseEvent) {
+    if (!lastRender) return null;
     const rect = wrapRef.current?.getBoundingClientRect();
-    if (!rect || rect.width === 0 || rect.height === 0) return;
-    // Map CSS pointer position → render-resolution pixel coordinate, then to
-    // bottom-left origin (top-row 0 becomes y = height-1) for pixelInfoAt.
+    if (!rect || rect.width === 0 || rect.height === 0) return null;
     const cx = (e.clientX - rect.left) / rect.width;
     const cy = (e.clientY - rect.top) / rect.height;
     const xTop = Math.floor(cx * lastRender.width);
     const yTop = Math.floor(cy * lastRender.height);
-    setPixelInfo(pixelInfoAt(lastRender, xTop, lastRender.height - 1 - yTop));
+    const x = xTop;
+    const y = lastRender.height - 1 - yTop; // top-row 0 → y = height-1
+    if (x < 0 || x >= lastRender.width || y < 0 || y >= lastRender.height) {
+      return null;
+    }
+    return { x, y };
+  }
+
+  function samplePixel(e: React.PointerEvent | React.MouseEvent) {
+    const at = pixelAtPointer(e);
+    // Track the hovered pixel regardless of the Inspect toggle, so the
+    // pin-hovered-pixel hotkey can grab it even with Inspect off. Dedup so we
+    // only write the store when the pixel actually changes.
+    const cur = useAppStore.getState().hoverPixel;
+    if (!at) {
+      if (cur) setHoverPixel(null);
+    } else if (!cur || cur.x !== at.x || cur.y !== at.y) {
+      setHoverPixel(at);
+    }
+    // The full inspector readout (color, UV) only updates when Inspect is on.
+    if (!pixelInspector || !at || !lastRender) {
+      setPixelInfo(null);
+      return;
+    }
+    setPixelInfo(pixelInfoAt(lastRender, at.x, at.y));
   }
 
   function onPointerDown(e: React.PointerEvent) {
@@ -330,7 +352,7 @@ export default function RenderView() {
           onClick={togglePixelInspector}
           className={pixelInspector ? "push-right primary" : "push-right"}
           aria-pressed={pixelInspector}
-          title="Inspect the pixel under the cursor: its resolution, UV, and color show in the Inspector panel (shortcut: Cmd+I / Alt+I)"
+          title="Inspect the pixel under the cursor: its resolution, UV, and color show in the Inspector panel (Cmd+I / Alt+I). Cmd/Alt+Shift+I pins the hovered pixel."
         >
           Inspect
         </button>
@@ -350,7 +372,10 @@ export default function RenderView() {
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerUp}
-        onPointerLeave={() => setPixelInfo(null)}
+        onPointerLeave={() => {
+          setPixelInfo(null);
+          setHoverPixel(null);
+        }}
         onWheel={onWheel}
       >
         <canvas ref={canvasRef} className="render-canvas" />

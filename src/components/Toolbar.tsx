@@ -133,11 +133,21 @@ export default function Toolbar() {
     const onKey = (e: KeyboardEvent) => {
       const typing = isTypingInForm(e.target as HTMLElement);
 
-      // Toggle the pixel inspector: Cmd+I on macOS, Alt+I on Windows/Linux.
-      // e.code is layout-independent and dodges the dead-key Alt+I produces on
-      // some macOS layouts. The Cmd/Ctrl form fires anywhere; the Alt form is
-      // skipped while typing so it can't swallow an Alt character entry.
+      // Pixel inspector shortcuts (e.code is layout-independent and dodges the
+      // dead-key Alt+I produces on some macOS layouts):
+      //   Cmd+I (macOS) / Alt+I (Windows/Linux)        toggle Inspect
+      //   Cmd+Shift+I (macOS) / Alt+Shift+I (Windows)  pin the hovered pixel
+      // Cmd/Ctrl forms fire anywhere; Alt forms are skipped while typing so
+      // they can't swallow an Alt character entry.
       if (e.code === "KeyI") {
+        const cmdPin = (e.metaKey || e.ctrlKey) && e.shiftKey && !e.altKey;
+        const altPin = e.altKey && e.shiftKey && !e.metaKey && !e.ctrlKey;
+        if (cmdPin || (altPin && !typing)) {
+          e.preventDefault();
+          const hp = useAppStore.getState().hoverPixel;
+          if (hp) useAppStore.getState().setPinnedPixel(hp);
+          return;
+        }
         const cmd = (e.metaKey || e.ctrlKey) && !e.altKey && !e.shiftKey;
         const alt = e.altKey && !e.metaKey && !e.ctrlKey && !e.shiftKey;
         if (cmd || (alt && !typing)) {

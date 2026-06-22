@@ -111,13 +111,20 @@ export default function HelpModal({ open, onClose }: Props) {
                   <td>
                     <kbd>Cmd/Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>S</kbd>
                   </td>
-                  <td>Save As… — choose a new file (or hold Shift and click Save)</td>
+                  <td>Save As: choose a new file (or hold Shift and click Save)</td>
                 </tr>
                 <tr>
                   <td>
                     <kbd>Cmd</kbd>+<kbd>I</kbd> / <kbd>Alt</kbd>+<kbd>I</kbd>
                   </td>
                   <td>Toggle the pixel inspector (macOS / Windows)</td>
+                </tr>
+                <tr>
+                  <td>
+                    <kbd>Cmd</kbd>+<kbd>Shift</kbd>+<kbd>I</kbd> /{" "}
+                    <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>I</kbd>
+                  </td>
+                  <td>Pin the pixel under the cursor (shows in the Inspector)</td>
                 </tr>
                 <tr>
                   <td>Quality (toolbar)</td>

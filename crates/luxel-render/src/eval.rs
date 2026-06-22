@@ -30,7 +30,8 @@ use crate::shader::compile_full_fragment;
 pub struct EvalInputs {
     /// iResolution.xy in pixels.
     pub resolution: [f32; 2],
-    /// The pixel to evaluate at, bottom-left origin (drives gl_FragCoord.xy).
+    /// The pixel index to evaluate at, bottom-left origin. gl_FragCoord.xy is
+    /// derived as the fragment center (index + 0.5).
     pub pixel: [f32; 2],
     pub time: f32,
     pub frame: i32,
@@ -290,7 +291,10 @@ layout(location = 0) out vec4 outColor;\n",
         glf(basis.right[0]), glf(basis.right[1]), glf(basis.right[2]),
         glf(basis.up[0]), glf(basis.up[1]), glf(basis.up[2]),
         glf(o[0]), glf(o[1]), glf(o[2]),
-        glf(u.pixel[0]), glf(u.pixel[1]),
+        // gl_FragCoord.xy is the fragment center, so it's the pixel index
+        // plus (0.5, 0.5): index (1,1) gives gl_FragCoord (1.5, 1.5). This
+        // also makes gl_FragCoord.xy / iResolution.xy match the inspector UV.
+        glf(u.pixel[0].floor() + 0.5), glf(u.pixel[1].floor() + 0.5),
     )
 }
 

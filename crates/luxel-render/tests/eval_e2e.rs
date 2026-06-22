@@ -69,10 +69,11 @@ fn builtins_evaluate_to_expected_values() {
 #[test]
 fn fragcoord_uses_the_supplied_pixel() {
     let Some(r) = try_renderer() else { return };
-    let i = inputs(); // pixel (40,100), resolution (320,240)
+    let i = inputs(); // pixel index (40,100), resolution (320,240)
+    // gl_FragCoord is the fragment center, so (40.5, 100.5).
     // (gl_FragCoord.xy - 0.5*iResolution.xy) / iResolution.y
-    //   x = (40 - 160) / 240 = -0.5
-    //   y = (100 - 120) / 240 = -0.083333...
+    //   x = (40.5 - 160) / 240 = -0.498
+    //   y = (100.5 - 120) / 240 = -0.08125
     let out = r
         .eval_expression(
             "",
@@ -81,8 +82,8 @@ fn fragcoord_uses_the_supplied_pixel() {
         )
         .expect("fragcoord eval");
     assert_eq!(out.type_name, "vec2");
-    approx(out.components[0], -0.5);
-    approx(out.components[1], -20.0 / 240.0);
+    approx(out.components[0], (40.5 - 160.0) / 240.0);
+    approx(out.components[1], (100.5 - 120.0) / 240.0);
 }
 
 #[test]
