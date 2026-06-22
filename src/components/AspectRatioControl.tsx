@@ -88,7 +88,9 @@ export default function AspectRatioControl() {
             }}
             size={6}
           />
-          <button onClick={applyCustom}>Set</button>
+          <button onClick={applyCustom} title="Apply the custom W:H aspect ratio">
+            Set
+          </button>
         </>
       )}
       <label className="toggle">

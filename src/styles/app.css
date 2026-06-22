@@ -435,7 +435,8 @@ a:focus-visible,
   height: 100%;
   display: block;
 }
-.frustum-overlay {
+.frustum-overlay,
+.crosshair-overlay {
   position: absolute;
   inset: 0;
   width: 100%;
@@ -545,6 +546,150 @@ a:focus-visible,
   padding: 2px 8px;
   border-bottom: 1px solid #151c26;
 }
+/* ---- Scratchpad (GLSL expression REPL) ---- */
+.scratchpad-panel > header .scratchpad-header-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 8px;
+  font-weight: 400;
+  color: #7d8a98;
+}
+.scratchpad-header-field input {
+  width: 6ch;
+  background: #1c2531;
+  border: 1px solid #2a3645;
+  color: #d6dde6;
+  border-radius: 3px;
+  font: inherit;
+  padding: 1px 4px;
+}
+.scratchpad-header-field input.sp-time-input {
+  width: 9ch;
+}
+/* Reclaim the spin-button space so digits get the full field (the pixel and
+   iTime values are read, not nudged). WKWebView honors these. */
+.scratchpad-header-field input::-webkit-inner-spin-button,
+.scratchpad-header-field input::-webkit-outer-spin-button,
+.inspector-pin-input::-webkit-inner-spin-button,
+.inspector-pin-input::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.scratchpad-list {
+  flex: 1;
+  overflow: auto;
+  padding: 6px 8px;
+  font-family: ui-monospace, "JetBrains Mono", Menlo, monospace;
+}
+.scratchpad-empty {
+  color: #7d8a98;
+  line-height: 1.6;
+}
+.scratchpad-empty code {
+  color: #b9c4d2;
+  background: #151c26;
+  padding: 0 3px;
+  border-radius: 3px;
+}
+.scratchpad-entry {
+  margin-bottom: 6px;
+}
+.sp-expr {
+  color: #d6dde6;
+}
+.sp-prompt {
+  color: #5d6a78;
+  user-select: none;
+}
+.sp-result {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-left: 14px;
+}
+.sp-value {
+  color: #9cdcfe;
+}
+.sp-type {
+  color: #7d8a98;
+  font-size: 0.85em;
+}
+.sp-error {
+  color: #ff8b8b;
+  padding-left: 14px;
+  white-space: pre-wrap;
+}
+.sp-note {
+  color: #f0c674;
+  padding-left: 14px;
+  white-space: pre-wrap;
+}
+.sp-swatch {
+  width: 12px;
+  height: 12px;
+  border: 1px solid #2a3645;
+  border-radius: 2px;
+}
+.scratchpad-input-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border-top: 1px solid #1f2a39;
+  font-family: ui-monospace, "JetBrains Mono", Menlo, monospace;
+}
+/* Completion dropdown, anchored above the input row. */
+.scratchpad-complete {
+  position: absolute;
+  left: 8px;
+  bottom: 100%;
+  margin: 0 0 2px;
+  padding: 2px;
+  list-style: none;
+  max-height: 220px;
+  overflow-y: auto;
+  min-width: 280px;
+  background: #11161e;
+  border: 1px solid #2a3645;
+  border-radius: 4px;
+  box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.45);
+  z-index: 20;
+}
+.scratchpad-complete li {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 2px 8px;
+  border-radius: 3px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.scratchpad-complete li.selected {
+  background: #1d4ed8;
+}
+.sc-label {
+  color: #d6dde6;
+  font-family: ui-monospace, "JetBrains Mono", Menlo, monospace;
+}
+.sc-detail {
+  color: #7d8a98;
+  font-size: 0.85em;
+  margin-left: auto;
+}
+.scratchpad-complete li.selected .sc-detail {
+  color: #c7d6ff;
+}
+.scratchpad-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: #d6dde6;
+  font: inherit;
+  outline: none;
+}
+
 .console-list time { color: #7d8a98; }
 .console-list .src { color: #7ad3ff; }
 .console-list .loc { color: #d68b8b; }
@@ -806,6 +951,21 @@ a:focus-visible,
   display: inline-flex;
   align-items: center;
   gap: 6px;
+}
+.inspector-pin {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+.inspector-pin-input {
+  width: 6ch;
+  background: #1c2531;
+  border: 1px solid #2a3645;
+  color: #d6dde6;
+  border-radius: 3px;
+  font: inherit;
+  padding: 1px 4px;
 }
 .cam-pos {
   font-family: ui-monospace, "JetBrains Mono", Menlo, monospace;

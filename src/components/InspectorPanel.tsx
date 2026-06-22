@@ -1,28 +1,54 @@
 import { useRef } from "react";
-import { useAppStore, type PixelInfo } from "../state/appStore";
+import { fontSizeForView, useAppStore, type PixelInfo } from "../state/appStore";
 import { useSceneStore } from "../state/sceneStore";
+import { pixelInfoAt } from "./pixelMath";
 
 /// Standalone inspector panel for shader debugging. Shows the same pixel
 /// metadata as the render-view footer bar, plus uniforms and camera state.
-/// Font scales with Shift+Cmd/Ctrl +/- so it's readable during screencasts.
+/// Font scales with the shared zoom hotkey while hovered.
 export default function InspectorPanel() {
   const file = useSceneStore((s) => s.file);
   const lastRender = useAppStore((s) => s.lastRender);
   const pixelInspector = useAppStore((s) => s.pixelInspector);
   const pixelInfo = useAppStore((s) => s.pixelInfo);
   const mouse = useAppStore((s) => s.mouse);
-  const fontSize = useAppStore((s) => s.inspectorFontSize);
+  const pinnedPixel = useAppStore((s) => s.pinnedPixel);
+  const setPinnedPixel = useAppStore((s) => s.setPinnedPixel);
+  const fontSize = useAppStore((s) => fontSizeForView(s.viewFontSizes, "inspector"));
 
   // Retain the last sampled pixel so the four rows stay populated after the
   // cursor leaves the canvas, instead of collapsing to a hint. `pixelInfo`
-  // is the live value (null when not hovering); `shownPixel` is what we
-  // render.
+  // is the live value (null when not hovering).
   const lastPixelRef = useRef<PixelInfo | null>(null);
   if (pixelInfo) lastPixelRef.current = pixelInfo;
-  const shownPixel = pixelInfo ?? lastPixelRef.current;
   const hovering = pixelInfo != null;
 
+  // A pinned pixel (set below) shows in the inspector even with interactive
+  // Inspect off. It's null when the pinned coordinate is outside the current
+  // render (e.g. the canvas shrank), which we surface as a note.
+  const pinnedInfo =
+    pinnedPixel && lastRender
+      ? pixelInfoAt(lastRender, pinnedPixel.x, pinnedPixel.y)
+      : null;
+  // Display precedence: live hover → pinned pixel → last hovered value.
+  const shownPixel = pixelInfo ?? pinnedInfo ?? lastPixelRef.current;
+  // Pinned but out of range, and not actively hovering: show the note instead
+  // of a stale value.
+  const pinnedOutOfBounds =
+    pinnedPixel != null && pinnedInfo == null && pixelInfo == null;
+
   if (!file) return null;
+
+  const setPinX = (v: string) => {
+    const x = parseInt(v, 10);
+    if (Number.isNaN(x)) return;
+    setPinnedPixel({ x, y: pinnedPixel?.y ?? 0 });
+  };
+  const setPinY = (v: string) => {
+    const y = parseInt(v, 10);
+    if (Number.isNaN(y)) return;
+    setPinnedPixel({ x: pinnedPixel?.x ?? 0, y });
+  };
 
   const t = file.scene.timeline;
   const cam = file.scene.camera;
@@ -64,17 +90,54 @@ export default function InspectorPanel() {
         <InspectorSection
           title="Pixel"
           aside={
-            !pixelInspector ? (
+            hovering ? null : pinnedPixel ? (
+              <span className="inspector-hint">
+                pinned {pinnedPixel.x}, {pinnedPixel.y}
+              </span>
+            ) : !pixelInspector ? (
               <span className="inspector-hint">Inspect off</span>
-            ) : !hovering ? (
+            ) : (
               <span className="inspector-hint">Hover over render</span>
-            ) : null
+            )
           }
         >
-          {shownPixel ? (
+          <div className="inspector-pin">
+            <span className="inspector-label">Pin (x, y)</span>
+            <input
+              type="number"
+              className="inspector-pin-input"
+              value={pinnedPixel?.x ?? ""}
+              onChange={(e) => setPinX(e.target.value)}
+              placeholder="x"
+              aria-label="Pinned pixel X"
+            />
+            <input
+              type="number"
+              className="inspector-pin-input"
+              value={pinnedPixel?.y ?? ""}
+              onChange={(e) => setPinY(e.target.value)}
+              placeholder="y"
+              aria-label="Pinned pixel Y"
+            />
+            {pinnedPixel && (
+              <button onClick={() => setPinnedPixel(null)} title="Unpin">
+                Clear
+              </button>
+            )}
+          </div>
+          {pinnedOutOfBounds ? (
+            <Row label="">
+              Pixel ({pinnedPixel.x}, {pinnedPixel.y}) is outside the current{" "}
+              {lastRender ? `${lastRender.width}×${lastRender.height}` : ""}{" "}
+              render.
+            </Row>
+          ) : shownPixel ? (
             <>
-              <Row label="Coordinate">
+              <Row label="Pixel">
                 {shownPixel.px}, {shownPixel.py}
+              </Row>
+              <Row label="FragCoord">
+                {(shownPixel.px + 0.5).toFixed(1)}, {(shownPixel.py + 0.5).toFixed(1)}
               </Row>
               <Row label="UV">
                 {shownPixel.u.toFixed(4)}, {shownPixel.v.toFixed(4)}
@@ -101,8 +164,8 @@ export default function InspectorPanel() {
           ) : (
             <Row label="">
               {pixelInspector
-                ? "Hover over render to sample"
-                : "Enable Inspect in render view"}
+                ? "Hover the render, or pin a pixel above"
+                : "Pin a pixel above, or enable Inspect"}
             </Row>
           )}
         </InspectorSection>

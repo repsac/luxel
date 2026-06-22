@@ -121,7 +121,11 @@ export default function LayoutMenu() {
                 }}
                 aria-label="Layout name"
               />
-              <button onClick={commitSaveAsCustom} disabled={!savingName.trim()}>
+              <button
+                onClick={commitSaveAsCustom}
+                disabled={!savingName.trim()}
+                title="Save this arrangement as a reusable custom layout"
+              >
                 Save
               </button>
             </div>

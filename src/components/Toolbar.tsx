@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useAppStore } from "../state/appStore";
+import { isFontScalable, useAppStore } from "../state/appStore";
 import { useSceneStore, type SceneFile as SceneFileType } from "../state/sceneStore";
 import { useConsoleStore } from "../state/consoleStore";
 import { formatError, invoke } from "../tauri/commands";
@@ -133,11 +133,21 @@ export default function Toolbar() {
     const onKey = (e: KeyboardEvent) => {
       const typing = isTypingInForm(e.target as HTMLElement);
 
-      // Toggle the pixel inspector: Cmd+I on macOS, Alt+I on Windows/Linux.
-      // e.code is layout-independent and dodges the dead-key Alt+I produces on
-      // some macOS layouts. The Cmd/Ctrl form fires anywhere; the Alt form is
-      // skipped while typing so it can't swallow an Alt character entry.
+      // Pixel inspector shortcuts (e.code is layout-independent and dodges the
+      // dead-key Alt+I produces on some macOS layouts):
+      //   Cmd+I (macOS) / Alt+I (Windows/Linux)        toggle Inspect
+      //   Cmd+Shift+I (macOS) / Alt+Shift+I (Windows)  pin the hovered pixel
+      // Cmd/Ctrl forms fire anywhere; Alt forms are skipped while typing so
+      // they can't swallow an Alt character entry.
       if (e.code === "KeyI") {
+        const cmdPin = (e.metaKey || e.ctrlKey) && e.shiftKey && !e.altKey;
+        const altPin = e.altKey && e.shiftKey && !e.metaKey && !e.ctrlKey;
+        if (cmdPin || (altPin && !typing)) {
+          e.preventDefault();
+          const hp = useAppStore.getState().hoverPixel;
+          if (hp) useAppStore.getState().setPinnedPixel(hp);
+          return;
+        }
         const cmd = (e.metaKey || e.ctrlKey) && !e.altKey && !e.shiftKey;
         const alt = e.altKey && !e.metaKey && !e.ctrlKey && !e.shiftKey;
         if (cmd || (alt && !typing)) {
@@ -162,30 +172,20 @@ export default function Toolbar() {
         return;
       }
       if (e.metaKey || e.ctrlKey) {
-        // Shift+Cmd/Ctrl +/- scales the inspector font; plain Cmd/Ctrl +/- scales the editor.
-        if (e.shiftKey && (e.key === "=" || e.key === "+")) {
+        // Font scaling (Cmd/Ctrl +/-/0) applies to the view under the cursor,
+        // so one shortcut scales whichever panel you're looking at. We still
+        // preventDefault when no scalable view is hovered, so the webview's
+        // own zoom doesn't kick in.
+        if (e.key === "=" || e.key === "+" || e.key === "-" || e.key === "_" || e.key === "0") {
           e.preventDefault();
-          useAppStore.getState().increaseInspectorFontSize();
-          return;
-        }
-        if (e.shiftKey && (e.key === "-" || e.key === "_")) {
-          e.preventDefault();
-          useAppStore.getState().decreaseInspectorFontSize();
-          return;
-        }
-        if (e.key === "=" || e.key === "+") {
-          e.preventDefault();
-          useAppStore.getState().increaseEditorFontSize();
-          return;
-        }
-        if (e.key === "-" || e.key === "_") {
-          e.preventDefault();
-          useAppStore.getState().decreaseEditorFontSize();
-          return;
-        }
-        if (e.key === "0") {
-          e.preventDefault();
-          useAppStore.getState().resetEditorFontSize();
+          const view = useAppStore.getState().hoveredView;
+          if (isFontScalable(view)) {
+            if (e.key === "0") useAppStore.getState().resetViewFontSize(view);
+            else {
+              const delta = e.key === "-" || e.key === "_" ? -1 : 1;
+              useAppStore.getState().adjustViewFontSize(view, delta);
+            }
+          }
           return;
         }
         // Cmd/Ctrl + Left/Right = jump to first/last frame, but only when

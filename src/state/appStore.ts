@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import type { ConsoleEvent } from "./consoleStore";
+import type { ViewId } from "./sceneStore";
 
 export type ShaderStatus = "clean" | "compiling" | "compiled" | "error";
 
@@ -83,12 +84,25 @@ interface AppStore {
   /// position, with z/w flipped negative while the button is up. Fed by
   /// left-drags on the render view.
   mouse: [number, number, number, number];
-  /// Font size used in the inspector panel, in CSS pixels. Persisted via
-  /// localStorage so it survives restarts.
-  inspectorFontSize: number;
-  /// Font size used in the GLSL editor, in CSS pixels. Persisted via
-  /// localStorage so it survives restarts.
-  editorFontSize: number;
+  /// A manually pinned pixel in bottom-left / gl_FragCoord space, used for
+  /// teaching: the Inspector shows it even when interactive Inspect is off,
+  /// and the render view marks it with a crosshair. Preserved across canvas
+  /// resizes; only its derived display reacts when it falls out of bounds.
+  pinnedPixel: { x: number; y: number } | null;
+  /// The pixel under the cursor in the render view (bottom-left index), tracked
+  /// regardless of the Inspect toggle so the "pin hovered pixel" hotkey can
+  /// grab it. Null when the cursor is off the canvas.
+  hoverPixel: { x: number; y: number } | null;
+  /// Whether to draw the crosshair marker over the pinned pixel.
+  showCrosshair: boolean;
+  /// Per-view text size in CSS pixels, keyed by view. Only views in
+  /// FONT_DEFAULTS are scalable; a missing entry means "use the default".
+  /// Persisted as one map so it survives restarts.
+  viewFontSizes: Partial<Record<ViewId, number>>;
+  /// The view the pointer is currently over. The font hotkey targets this
+  /// view so one shortcut scales whichever panel you're looking at. Not
+  /// cleared on leave, so it stays forgiving when the cursor drifts away.
+  hoveredView: ViewId | null;
   /// performance.now() timestamps of recent completed renders. Used to derive
   /// a rolling FPS without storing per-frame state in the scene file.
   renderTimestamps: number[];
@@ -118,51 +132,103 @@ interface AppStore {
   togglePixelInspector: () => void;
   setPixelInfo: (info: PixelInfo | null) => void;
   setMouse: (m: [number, number, number, number]) => void;
-  setInspectorFontSize: (size: number) => void;
-  increaseInspectorFontSize: () => void;
-  decreaseInspectorFontSize: () => void;
-  resetInspectorFontSize: () => void;
-  setEditorFontSize: (size: number) => void;
-  increaseEditorFontSize: () => void;
-  decreaseEditorFontSize: () => void;
-  resetEditorFontSize: () => void;
+  setPinnedPixel: (p: { x: number; y: number } | null) => void;
+  setHoverPixel: (p: { x: number; y: number } | null) => void;
+  setShowCrosshair: (on: boolean) => void;
+  toggleCrosshair: () => void;
+  setHoveredView: (view: ViewId | null) => void;
+  setViewFontSize: (view: ViewId, size: number) => void;
+  adjustViewFontSize: (view: ViewId, delta: number) => void;
+  resetViewFontSize: (view: ViewId) => void;
   recordRenderCompleted: (now?: number) => void;
 }
 
 const AUTO_RENDER_KEY = "luxel.autoRender";
-const PIXEL_INSPECTOR_KEY = "luxel.pixelInspector";
-const INSPECTOR_FONT_KEY = "luxel.inspectorFontSize";
-export const INSPECTOR_FONT_DEFAULT = 14;
 const LOOP_PLAYBACK_KEY = "luxel.loopPlayback";
 const SHOW_FPS_KEY = "luxel.showFps";
 const SHOW_FRUSTUM_KEY = "luxel.showFrustumOverlay";
-const EDITOR_FONT_KEY = "luxel.editorFontSize";
-export const EDITOR_FONT_DEFAULT = 13;
-export const EDITOR_FONT_MIN = 8;
-export const EDITOR_FONT_MAX = 32;
 
-function readStoredNumber(key: string, fallback: number): number {
-  try {
-    const v = localStorage.getItem(key);
-    if (v === null) return fallback;
-    const n = parseInt(v, 10);
-    return Number.isFinite(n) ? n : fallback;
-  } catch {
-    return fallback;
-  }
+// ---- Font sizing ----
+export const FONT_MIN = 8;
+export const FONT_MAX = 32;
+const FONT_FALLBACK = 13;
+
+/// Views whose text can be scaled, with their default size in CSS px. A view
+/// absent from this map is not font-scalable (e.g. the render view).
+export const FONT_DEFAULTS: Partial<Record<ViewId, number>> = {
+  editor: 13,
+  inspector: 14,
+  console: 12,
+  scratchpad: 13,
+};
+
+const VIEW_FONT_KEY = "luxel.viewFontSizes";
+// Legacy single-view keys, migrated into the map on first load.
+const LEGACY_FONT_KEYS: Partial<Record<ViewId, string>> = {
+  editor: "luxel.editorFontSize",
+  inspector: "luxel.inspectorFontSize",
+};
+
+/// Resolve a view's effective font size: its stored value, else the view's
+/// default, else a generic fallback.
+export function fontSizeForView(
+  sizes: Partial<Record<ViewId, number>>,
+  view: ViewId,
+): number {
+  return sizes[view] ?? FONT_DEFAULTS[view] ?? FONT_FALLBACK;
 }
 
-function writeStoredNumber(key: string, value: number): void {
-  try {
-    localStorage.setItem(key, String(value));
-  } catch {
-    // Private/locked storage — silently ignore.
-  }
+/// Whether the font hotkey can act on this view.
+export function isFontScalable(view: ViewId | null): view is ViewId {
+  return view != null && view in FONT_DEFAULTS;
 }
 
 function clampFont(size: number): number {
-  if (!Number.isFinite(size)) return EDITOR_FONT_DEFAULT;
-  return Math.max(EDITOR_FONT_MIN, Math.min(EDITOR_FONT_MAX, Math.round(size)));
+  if (!Number.isFinite(size)) return FONT_FALLBACK;
+  return Math.max(FONT_MIN, Math.min(FONT_MAX, Math.round(size)));
+}
+
+/// Load the per-view font map, migrating any legacy single-view keys that
+/// haven't been folded in yet.
+function readViewFontSizes(): Partial<Record<ViewId, number>> {
+  const out: Partial<Record<ViewId, number>> = {};
+  try {
+    const raw = localStorage.getItem(VIEW_FONT_KEY);
+    if (raw) {
+      const parsed: unknown = JSON.parse(raw);
+      if (parsed && typeof parsed === "object") {
+        for (const [k, v] of Object.entries(parsed as Record<string, unknown>)) {
+          if (typeof v === "number" && Number.isFinite(v)) {
+            out[k as ViewId] = clampFont(v);
+          }
+        }
+      }
+    }
+  } catch {
+    // Corrupt/unavailable storage — fall back to defaults.
+  }
+  for (const [view, legacyKey] of Object.entries(LEGACY_FONT_KEYS)) {
+    const v = view as ViewId;
+    if (out[v] !== undefined || !legacyKey) continue;
+    try {
+      const raw = localStorage.getItem(legacyKey);
+      if (raw !== null) {
+        const n = parseInt(raw, 10);
+        if (Number.isFinite(n)) out[v] = clampFont(n);
+      }
+    } catch {
+      // ignore
+    }
+  }
+  return out;
+}
+
+function writeViewFontSizes(sizes: Partial<Record<ViewId, number>>): void {
+  try {
+    localStorage.setItem(VIEW_FONT_KEY, JSON.stringify(sizes));
+  } catch {
+    // Private/locked storage — silently ignore.
+  }
 }
 
 /// Local-storage-backed read; never throws on private-mode failures.
@@ -226,12 +292,17 @@ export const useAppStore = create<AppStore>((set) => ({
   showFrustumOverlay: readStoredFlag(SHOW_FRUSTUM_KEY, false),
   autoRender: readStoredFlag(AUTO_RENDER_KEY, true),
   renderRequested: false,
-  pixelInspector: readStoredFlag(PIXEL_INSPECTOR_KEY, false),
+  // Inspect and the crosshair are teaching aids that start off every launch
+  // (session-only, not persisted) so the viewport is clean by default.
+  pixelInspector: false,
   pixelInfo: null,
   mouse: [0, 0, 0, 0],
-  inspectorFontSize: clampFont(readStoredNumber(INSPECTOR_FONT_KEY, INSPECTOR_FONT_DEFAULT)),
+  pinnedPixel: null,
+  hoverPixel: null,
+  showCrosshair: false,
+  viewFontSizes: readViewFontSizes(),
+  hoveredView: null,
   gizmoEnabled: false,
-  editorFontSize: clampFont(readStoredNumber(EDITOR_FONT_KEY, EDITOR_FONT_DEFAULT)),
   renderTimestamps: [],
   setShaderStatus: (s) => set({ shaderStatus: s }),
   setLastRender: (r) => set({ lastRender: r }),
@@ -299,63 +370,35 @@ export const useAppStore = create<AppStore>((set) => ({
     }),
   requestRender: () => set({ renderRequested: true }),
   clearRenderRequest: () => set({ renderRequested: false }),
-  setPixelInspector: (on) => {
-    writeStoredFlag(PIXEL_INSPECTOR_KEY, on);
-    set({ pixelInspector: on });
-  },
-  togglePixelInspector: () =>
-    set((s) => {
-      const next = !s.pixelInspector;
-      writeStoredFlag(PIXEL_INSPECTOR_KEY, next);
-      return { pixelInspector: next };
-    }),
+  setPixelInspector: (on) => set({ pixelInspector: on }),
+  togglePixelInspector: () => set((s) => ({ pixelInspector: !s.pixelInspector })),
   setPixelInfo: (info) => set({ pixelInfo: info }),
   setMouse: (m) => set({ mouse: m }),
-  setInspectorFontSize: (size) =>
-    set(() => {
-      const next = clampFont(size);
-      writeStoredNumber(INSPECTOR_FONT_KEY, next);
-      return { inspectorFontSize: next };
-    }),
-  increaseInspectorFontSize: () =>
+  setPinnedPixel: (p) => set({ pinnedPixel: p }),
+  setHoverPixel: (p) => set({ hoverPixel: p }),
+  setShowCrosshair: (on) => set({ showCrosshair: on }),
+  toggleCrosshair: () => set((s) => ({ showCrosshair: !s.showCrosshair })),
+  setHoveredView: (view) => set({ hoveredView: view }),
+  setViewFontSize: (view, size) =>
     set((s) => {
-      const next = clampFont(s.inspectorFontSize + 1);
-      writeStoredNumber(INSPECTOR_FONT_KEY, next);
-      return { inspectorFontSize: next };
+      const next = { ...s.viewFontSizes, [view]: clampFont(size) };
+      writeViewFontSizes(next);
+      return { viewFontSizes: next };
     }),
-  decreaseInspectorFontSize: () =>
+  adjustViewFontSize: (view, delta) =>
     set((s) => {
-      const next = clampFont(s.inspectorFontSize - 1);
-      writeStoredNumber(INSPECTOR_FONT_KEY, next);
-      return { inspectorFontSize: next };
+      const current = fontSizeForView(s.viewFontSizes, view);
+      const next = { ...s.viewFontSizes, [view]: clampFont(current + delta) };
+      writeViewFontSizes(next);
+      return { viewFontSizes: next };
     }),
-  resetInspectorFontSize: () =>
-    set(() => {
-      writeStoredNumber(INSPECTOR_FONT_KEY, INSPECTOR_FONT_DEFAULT);
-      return { inspectorFontSize: INSPECTOR_FONT_DEFAULT };
-    }),
-  setEditorFontSize: (size) =>
-    set(() => {
-      const next = clampFont(size);
-      writeStoredNumber(EDITOR_FONT_KEY, next);
-      return { editorFontSize: next };
-    }),
-  increaseEditorFontSize: () =>
+  resetViewFontSize: (view) =>
     set((s) => {
-      const next = clampFont(s.editorFontSize + 1);
-      writeStoredNumber(EDITOR_FONT_KEY, next);
-      return { editorFontSize: next };
-    }),
-  decreaseEditorFontSize: () =>
-    set((s) => {
-      const next = clampFont(s.editorFontSize - 1);
-      writeStoredNumber(EDITOR_FONT_KEY, next);
-      return { editorFontSize: next };
-    }),
-  resetEditorFontSize: () =>
-    set(() => {
-      writeStoredNumber(EDITOR_FONT_KEY, EDITOR_FONT_DEFAULT);
-      return { editorFontSize: EDITOR_FONT_DEFAULT };
+      // Drop the override so the view falls back to its default.
+      const next = { ...s.viewFontSizes };
+      delete next[view];
+      writeViewFontSizes(next);
+      return { viewFontSizes: next };
     }),
   recordRenderCompleted: (now) =>
     set((s) => {

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useAppStore } from "../state/appStore";
 import { useSceneStore } from "../state/sceneStore";
 import { fitOverlay, parseAspect } from "./aspectMath";
+import { pixelInfoAt } from "./pixelMath";
 import { computeGizmo, dragDelta, pickAxis } from "./gizmoMath";
 import { GIZMO_POC_ENABLED } from "../featureFlags";
 import AspectRatioControl from "./AspectRatioControl";
@@ -44,7 +45,11 @@ export default function RenderView() {
   const togglePixelInspector = useAppStore((s) => s.togglePixelInspector);
   const pixelInfo = useAppStore((s) => s.pixelInfo);
   const setPixelInfo = useAppStore((s) => s.setPixelInfo);
+  const setHoverPixel = useAppStore((s) => s.setHoverPixel);
   const setMouse = useAppStore((s) => s.setMouse);
+  const pinnedPixel = useAppStore((s) => s.pinnedPixel);
+  const showCrosshair = useAppStore((s) => s.showCrosshair);
+  const toggleCrosshair = useAppStore((s) => s.toggleCrosshair);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const [wrapPx, setWrapPx] = useState({ w: 0, h: 0 });
@@ -122,6 +127,22 @@ export default function RenderView() {
       ? fitOverlay(previewW, previewH, aspect)
       : null;
 
+  // Crosshair marking the pinned pixel. Computed in render-pixel space (the
+  // overlay's viewBox), bottom-left origin flipped to SVG's top-left. Drawn
+  // only when the pinned pixel is inside the current render, so a pixel that
+  // fell out of bounds after a resize simply isn't marked (and reappears if
+  // the canvas grows back to include it).
+  const crosshair =
+    showCrosshair &&
+    pinnedPixel &&
+    lastRender &&
+    pinnedPixel.x >= 0 &&
+    pinnedPixel.x < lastRender.width &&
+    pinnedPixel.y >= 0 &&
+    pinnedPixel.y < lastRender.height
+      ? { cx: pinnedPixel.x + 0.5, cy: lastRender.height - (pinnedPixel.y + 0.5) }
+      : null;
+
   // Gizmo geometry is computed in CSS-pixel (wrap) space so it lines up 1:1
   // with pointer events and the overlay's viewBox. The render fills the wrap
   // at the same aspect ratio, so projecting against wrapPx matches what's on
@@ -150,35 +171,41 @@ export default function RenderView() {
     return [x, y];
   }
 
-  function samplePixel(e: React.PointerEvent | React.MouseEvent) {
-    if (!pixelInspector || !lastRender) {
-      setPixelInfo(null);
-      return;
-    }
+  /// Pointer position as a bottom-left render-pixel index, or null when off
+  /// the canvas / before the first render.
+  function pixelAtPointer(e: React.PointerEvent | React.MouseEvent) {
+    if (!lastRender) return null;
     const rect = wrapRef.current?.getBoundingClientRect();
-    if (!rect || rect.width === 0 || rect.height === 0) return;
-    // Map CSS pointer position → render-resolution pixel coordinate.
+    if (!rect || rect.width === 0 || rect.height === 0) return null;
     const cx = (e.clientX - rect.left) / rect.width;
     const cy = (e.clientY - rect.top) / rect.height;
-    const px = Math.floor(cx * lastRender.width);
-    const py = Math.floor(cy * lastRender.height);
-    if (px < 0 || px >= lastRender.width || py < 0 || py >= lastRender.height) {
+    const xTop = Math.floor(cx * lastRender.width);
+    const yTop = Math.floor(cy * lastRender.height);
+    const x = xTop;
+    const y = lastRender.height - 1 - yTop; // top-row 0 → y = height-1
+    if (x < 0 || x >= lastRender.width || y < 0 || y >= lastRender.height) {
+      return null;
+    }
+    return { x, y };
+  }
+
+  function samplePixel(e: React.PointerEvent | React.MouseEvent) {
+    const at = pixelAtPointer(e);
+    // Track the hovered pixel regardless of the Inspect toggle, so the
+    // pin-hovered-pixel hotkey can grab it even with Inspect off. Dedup so we
+    // only write the store when the pixel actually changes.
+    const cur = useAppStore.getState().hoverPixel;
+    if (!at) {
+      if (cur) setHoverPixel(null);
+    } else if (!cur || cur.x !== at.x || cur.y !== at.y) {
+      setHoverPixel(at);
+    }
+    // The full inspector readout (color, UV) only updates when Inspect is on.
+    if (!pixelInspector || !at || !lastRender) {
       setPixelInfo(null);
       return;
     }
-    const idx = (py * lastRender.width + px) * 4;
-    const r = lastRender.pixels[idx];
-    const g = lastRender.pixels[idx + 1];
-    const b = lastRender.pixels[idx + 2];
-    // UV: u goes 0→1 left-to-right, v goes 0→1 bottom-to-top (OpenGL).
-    // Display row 0 = top of screen = v=1, display row (height-1) = bottom = v=0.
-    const u = (px + 0.5) / lastRender.width;
-    const v = 1.0 - (py + 0.5) / lastRender.height;
-    setPixelInfo({
-      px, py: lastRender.height - 1 - py,
-      resX: lastRender.width, resY: lastRender.height,
-      u, v, r, g, b,
-    });
+    setPixelInfo(pixelInfoAt(lastRender, at.x, at.y));
   }
 
   function onPointerDown(e: React.PointerEvent) {
@@ -296,7 +323,10 @@ export default function RenderView() {
       <header>
         <span>Render</span>
         <AspectRatioControl />
-        <button onClick={resetCamera} title="Reset camera (F)">
+        <button
+          onClick={resetCamera}
+          title="Return the camera to its default position and angle (shortcut: F)"
+        >
           Reset cam
         </button>
         {GIZMO_POC_ENABLED && (
@@ -304,7 +334,7 @@ export default function RenderView() {
             onClick={toggleGizmo}
             className={gizmoEnabled ? "primary" : ""}
             aria-pressed={gizmoEnabled}
-            title="Toggle the move gizmo — drag the X/Y/Z handles to move the object (iObjectPosition)"
+            title="Toggle the move gizmo. Drag the X/Y/Z handles to move the object, exposed to shaders as iObjectPosition."
           >
             Move
           </button>
@@ -322,9 +352,17 @@ export default function RenderView() {
           onClick={togglePixelInspector}
           className={pixelInspector ? "push-right primary" : "push-right"}
           aria-pressed={pixelInspector}
-          title="Toggle pixel inspector — shows resolution, UV, and color under the cursor"
+          title="Inspect the pixel under the cursor: its resolution, UV, and color show in the Inspector panel (Cmd+I / Alt+I). Cmd/Alt+Shift+I pins the hovered pixel."
         >
           Inspect
+        </button>
+        <button
+          onClick={toggleCrosshair}
+          className={showCrosshair ? "primary" : ""}
+          aria-pressed={showCrosshair}
+          title="Mark the pinned pixel on the canvas with a crosshair. Set the pixel in the Inspector or Scratchpad."
+        >
+          Crosshair
         </button>
       </header>
       <div
@@ -334,7 +372,10 @@ export default function RenderView() {
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerUp}
-        onPointerLeave={() => setPixelInfo(null)}
+        onPointerLeave={() => {
+          setPixelInfo(null);
+          setHoverPixel(null);
+        }}
         onWheel={onWheel}
       >
         <canvas ref={canvasRef} className="render-canvas" />
@@ -354,6 +395,47 @@ export default function RenderView() {
               stroke="#7ad3ff"
               strokeDasharray="6 4"
               strokeWidth={1.5}
+              vectorEffect="non-scaling-stroke"
+            />
+          </svg>
+        )}
+        {crosshair && (
+          <svg
+            className="crosshair-overlay"
+            viewBox={`0 0 ${previewW} ${previewH}`}
+            preserveAspectRatio="none"
+          >
+            {/* Full-width/height guide lines plus a box around the pixel, so
+                it's easy to point to during a demo. Lines stop short of the
+                pixel so the target cell stays legible. */}
+            <line
+              x1={0}
+              y1={crosshair.cy}
+              x2={previewW}
+              y2={crosshair.cy}
+              stroke="#ffd166"
+              strokeWidth={1}
+              strokeDasharray="4 3"
+              vectorEffect="non-scaling-stroke"
+            />
+            <line
+              x1={crosshair.cx}
+              y1={0}
+              x2={crosshair.cx}
+              y2={previewH}
+              stroke="#ffd166"
+              strokeWidth={1}
+              strokeDasharray="4 3"
+              vectorEffect="non-scaling-stroke"
+            />
+            <rect
+              x={crosshair.cx - 0.5}
+              y={crosshair.cy - 0.5}
+              width={1}
+              height={1}
+              fill="none"
+              stroke="#ffd166"
+              strokeWidth={2}
               vectorEffect="non-scaling-stroke"
             />
           </svg>

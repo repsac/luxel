@@ -1,6 +1,12 @@
 import { create } from "zustand";
 
-export type ViewId = "render" | "editor" | "console" | "inspector" | "empty";
+export type ViewId =
+  | "render"
+  | "editor"
+  | "console"
+  | "inspector"
+  | "scratchpad"
+  | "empty";
 
 export type LayoutShape =
   | "single"

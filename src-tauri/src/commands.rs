@@ -2,7 +2,9 @@ use std::path::PathBuf;
 
 use luxel_core::{validate_scene, SceneFile, ShaderSource};
 use luxel_io::{load_scene_file, save_scene_file};
-use luxel_render::{compile_glsl_fragment, FrameInputs, GpuBackend, ShaderCompileResult};
+use luxel_render::{
+    compile_glsl_fragment, EvalInputs, EvalResult, FrameInputs, GpuBackend, ShaderCompileResult,
+};
 use luxel_system::{GpuInfo, SystemStatus};
 use serde::Serialize;
 use tauri::ipc::Response;
@@ -177,6 +179,48 @@ pub fn render_single_frame(
             Err(AppError::Render(e.to_string()))
         }
     }
+}
+
+/// Evaluate a single GLSL expression at a pixel and return its value. Backs
+/// the Scratchpad. Uniforms come from the scene (so the result matches the
+/// live shader) but the resolution, pixel, time, frame, and mouse can be
+/// overridden so the user can probe hypotheticals. `preamble` is extra GLSL
+/// (e.g. REPL variable declarations) placed before the generated `main`.
+#[tauri::command]
+#[allow(non_snake_case, clippy::too_many_arguments)]
+pub fn eval_glsl(
+    scene: SceneFile,
+    expr: String,
+    preamble: Option<String>,
+    resolution: [u32; 2],
+    pixel: [f32; 2],
+    timeOverride: Option<f32>,
+    frameOverride: Option<i32>,
+    mouseOverride: Option<[f32; 4]>,
+    state: State<'_, AppState>,
+) -> Result<EvalResult, AppError> {
+    let renderer = state.renderer().map_err(AppError::Render)?;
+    let inputs = EvalInputs {
+        resolution: [resolution[0].max(1) as f32, resolution[1].max(1) as f32],
+        pixel,
+        time: timeOverride.unwrap_or(0.0),
+        frame: frameOverride.unwrap_or(0),
+        mouse: mouseOverride.unwrap_or([0.0; 4]),
+        camera: scene.scene.camera,
+        object: scene.scene.object.position,
+    };
+    renderer
+        .eval_expression(preamble.as_deref().unwrap_or(""), &expr, &inputs)
+        .map_err(|e| {
+            // Surface the first compile diagnostic as the message so the
+            // Scratchpad can show what went wrong.
+            if let luxel_render::RenderError::ShaderCompile(sc) = &e {
+                if let Some(d) = sc.diagnostics.first() {
+                    return AppError::Shader(d.message.clone());
+                }
+            }
+            AppError::Render(e.to_string())
+        })
 }
 
 #[tauri::command]

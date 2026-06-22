@@ -85,6 +85,45 @@ pub fn compile_glsl_fragment(src: &ShaderSource) -> Result<ShaderCompileResult, 
     })
 }
 
+/// Compile a complete GLSL 450 fragment shader (no prelude wrapping) to WGSL.
+/// Used by the expression evaluator, which generates its own self-contained
+/// source with uniforms baked in as constants. Returns the WGSL on success or
+/// the frontend/validator diagnostics on failure (line numbers refer to the
+/// generated source and aren't mapped back, since the evaluator builds it).
+pub fn compile_full_fragment(source: &str) -> Result<String, ShaderCompileError> {
+    let mut frontend = Frontend::default();
+    let options = GlslOptions::from(ShaderStage::Fragment);
+    let module = frontend.parse(&options, source).map_err(|errors| {
+        let diagnostics = errors
+            .errors
+            .iter()
+            .map(|e| ShaderDiagnostic {
+                message: format!("{}", e.kind),
+                line: None,
+                column: None,
+            })
+            .collect();
+        ShaderCompileError { diagnostics }
+    })?;
+    let mut validator = Validator::new(ValidationFlags::all(), Capabilities::all());
+    let info = validator.validate(&module).map_err(|err| ShaderCompileError {
+        diagnostics: vec![ShaderDiagnostic {
+            message: format!("validation error: {}", err),
+            line: None,
+            column: None,
+        }],
+    })?;
+    naga::back::wgsl::write_string(&module, &info, WriterFlags::empty()).map_err(|err| {
+        ShaderCompileError {
+            diagnostics: vec![ShaderDiagnostic {
+                message: format!("wgsl emit error: {}", err),
+                line: None,
+                column: None,
+            }],
+        }
+    })
+}
+
 /// Locate the line marker for the user shader inside the wrapped source so
 /// error lines can be mapped back to the user's editor.
 fn count_lines_before_user(wrapped: &str) -> usize {

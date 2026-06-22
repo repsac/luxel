@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { VIEW_LABELS } from "../state/layoutStore";
 import type { ViewId } from "../state/sceneStore";
 import { useSceneStore } from "../state/sceneStore";
+import { useAppStore } from "../state/appStore";
 
 interface Props {
   slotIndex: number;
@@ -9,19 +10,30 @@ interface Props {
   children: ReactNode;
 }
 
-const ALL_VIEWS: ViewId[] = ["render", "editor", "console", "inspector", "empty"];
+const ALL_VIEWS: ViewId[] = [
+  "render",
+  "editor",
+  "console",
+  "inspector",
+  "scratchpad",
+  "empty",
+];
 
 /// Thin slot-level toolbar above each panel: pick the view, maximize/restore.
 export default function SlotFrame({ slotIndex, view, children }: Props) {
   const file = useSceneStore((s) => s.file);
   const setSlotView = useSceneStore((s) => s.setSlotView);
   const setMaximized = useSceneStore((s) => s.setMaximized);
+  const setHoveredView = useAppStore((s) => s.setHoveredView);
   if (!file) return null;
   const maximized = file.scene.layout.maximized;
   const isMaximized = maximized === slotIndex;
 
   return (
-    <div className="slot">
+    // Track which view the pointer is over so the font hotkey knows its
+    // target. Not cleared on leave, so the last hovered panel stays the
+    // target while the cursor is over chrome like the toolbar.
+    <div className="slot" onMouseEnter={() => setHoveredView(view)}>
       <div className="slot-bar">
         <select
           value={view}

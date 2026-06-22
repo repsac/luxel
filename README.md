@@ -1,6 +1,6 @@
 # Luxel
 
-A local, developer-focused GLSL shader workbench: edit Shadertoy-style GLSL fragment shaders, render in real time, and inspect the result with camera tools, pixel inspector, debug console, and status monitoring.
+A local, developer-focused GLSL shader workbench: edit Shadertoy-style GLSL fragment shaders, render in real time, and inspect the result with camera tools, a pixel inspector, an interactive GLSL scratchpad, a debug console, and status monitoring.
 
 ![Luxel screenshot](docs/screenshot.png)
 
@@ -15,8 +15,10 @@ Milestone 0 through 6 scaffolding is in place:
 - Scene file format (`.luxel.json`) with `schemaVersion` and migration scaffolding.
 - Camera orbit/pan/dolly/reset, bookmarks, frustum overlay, aspect-ratio control.
 - Auto/manual render toggle with `requestAnimationFrame` render driver.
-- Pixel inspector with footer bar and dedicated Inspector panel view.
+- Pixel inspector (footer bar + dedicated Inspector panel) with a pinnable pixel and an on-canvas crosshair.
+- Interactive GLSL Scratchpad: evaluate expressions at a chosen pixel, with reusable variables, a built-in catalog, and Tab autocomplete.
 - Timeline playback with loop support.
+- Unified per-view font zoom that targets the panel under the cursor.
 - Cross-platform Python helper scripts.
 
 ## Requirements
@@ -140,9 +142,44 @@ The toolbar has an **Auto/Manual** dropdown next to the Render button. In Auto m
 
 ## Pixel inspector
 
-Toggle **Inspect** in the Render view header to show a footer bar under the canvas with live readouts of the pixel under the cursor: pixel coordinates, render resolution, UV, and RGB values with a color swatch.
+Toggle **Inspect** in the Render view header to show a footer bar under the canvas with live readouts of the pixel under the cursor: pixel coordinates (bottom-left origin, matching `gl_FragCoord`), render resolution, UV, and RGB values with a color swatch. Inspect is off by default and is a per-session toggle.
 
-The **Inspector** panel (available as a 4th view in the slot dropdown) shows the same pixel data along with uniforms, camera state, and render statistics. Its font size scales with `Shift+Cmd/Ctrl` + `+`/`-` for screencasting and tutorials.
+The **Inspector** panel (available in the slot dropdown) shows the same pixel data along with uniforms, camera state, and render statistics.
+
+### Pinning a pixel
+
+The Inspector's **Pin (x, y)** field locks the readout to a specific pixel, so it stays populated even with interactive Inspect off, and even when the cursor leaves the canvas. This is handy for teaching ("we're looking at pixel 40, 100"). The **Crosshair** toggle in the Render header marks that pixel on the canvas. The pinned pixel is in bottom-left / `gl_FragCoord` space and is shared with the Scratchpad. If a resize puts the pixel outside the current render, the readout says so and the crosshair hides until it's back in range.
+
+### Font zoom
+
+Editor, Inspector, Console, and Scratchpad text scale with one hotkey, `Cmd/Ctrl` + `+`/`-`/`0`, applied to whichever panel the cursor is over. The editor also has explicit zoom buttons in its header.
+
+## Scratchpad
+
+The **Scratchpad** view is a REPL for GLSL expressions: type an expression and see its value at the pinned pixel. It's the GLSL answer to print-debugging, useful for learning what built-ins and vector math actually do.
+
+Every scene uniform (`iResolution`, `iTime`, the camera uniforms, ...) and `gl_FragCoord` are in scope, prefilled from the current scene; `iTime` and the pixel are overridable in the Scratchpad header. Expressions are evaluated through the real `naga`/`wgpu` path (rendered to a 1-pixel float target), so results match the live shader exactly.
+
+```glsl
+> length(vec2(3.0, 4.0))
+5
+float
+> (gl_FragCoord.xy - 0.5 * iResolution.xy) / iResolution.y
+vec2(-0.5, -0.0833)
+vec2
+```
+
+| Action | What it does |
+| --- | --- |
+| `name = <expr>` | Snapshot a value and reuse it on later lines |
+| `Tab` | Autocomplete built-ins, uniforms, variables, and swizzles (after a vector `.`) |
+| `↑` / `↓` | Move the suggestion list, or walk expression history |
+| `:builtins` | List the available functions and uniforms |
+| `:help <name>` | Show a built-in's signature (e.g. `:help mix`) |
+| `:vars` / `:reset` | List or clear your variables |
+| `:clear` | Clear the scrollback |
+
+Color-like results (a `vec3`/`vec4` in `[0, 1]`) show a swatch. A built-in called with the wrong arguments reports its real signature instead of a generic "unknown function" error.
 
 ## Performance notes
 
@@ -193,9 +230,10 @@ luxel/
 │   ├── luxel-core/             # Scene model, camera math, validation
 │   ├── luxel-io/               # Scene JSON load/save + migrations
 │   ├── luxel-system/           # CPU/memory/GPU sampling
-│   └── luxel-render/           # wgpu pipeline, GLSL prelude, naga compile
+│   └── luxel-render/           # wgpu pipeline, GLSL prelude, naga compile, expression eval
 ├── src/                        # React frontend
-│   ├── components/             # LayoutRoot, RenderView, ShaderEditor, ConsolePanel, InspectorPanel, ...
+│   ├── components/             # LayoutRoot, RenderView, ShaderEditor, ConsolePanel, InspectorPanel, Scratchpad, ...
+│   ├── glsl/                   # Built-in catalog for Scratchpad help/autocomplete
 │   ├── state/                  # Zustand stores (scene, console, app)
 │   └── tauri/                  # invoke() and event subscription wrappers
 ├── scripts/                    # Python build/test/launch helpers
@@ -210,6 +248,7 @@ luxel/
 - `default_scene() -> SceneFile`
 - `compile_shader(shader) -> ShaderCompileResult`
 - `render_single_frame(scene) -> RenderResult`
+- `eval_glsl(scene, expr, preamble, resolution, pixel, ...) -> EvalResult`
 - `get_system_status() -> SystemStatus`
 - `get_gpu_info() -> GpuInfo`
 - `set_gpu_backend(backend)`

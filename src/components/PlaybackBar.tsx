@@ -124,7 +124,7 @@ export default function PlaybackBar() {
           onClick={toggleLoopPlayback}
           className={loopPlayback ? "primary" : ""}
           aria-pressed={loopPlayback}
-          title="Loop playback — wrap around at timeline bounds"
+          title="Loop playback: wrap around at the timeline bounds instead of stopping"
           aria-label="Toggle loop"
         >
           🔁
@@ -185,7 +185,7 @@ export default function PlaybackBar() {
               onChange={(e) => updateLastFrame(parseInt(e.target.value, 10))}
             />
           </label>
-          <label title="Target playback FPS — affects iTime and play speed">
+          <label title="Target playback FPS: affects iTime and play speed">
             <span>FPS</span>
             <input
               type="number"
