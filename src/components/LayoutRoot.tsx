@@ -245,6 +245,51 @@ export default function LayoutRoot() {
       );
       break;
     }
+
+    case "twoByTwo":
+      // 2x2 grid: top row [0,1], bottom row [2,3]. `primary` is the top/bottom
+      // split; both rows share `secondary` for the left/right split so the
+      // columns stay aligned.
+      content = (
+        <Stack
+          mainRef={mainRef}
+          primary={primary}
+          onPrimary={onPrimary}
+          top={
+            <div className="row" style={{ height: "100%" }} ref={topRef}>
+              <Cell width={secondary}>
+                <SlotCell index={0} slot={slots[0]} />
+              </Cell>
+              <Splitter
+                orientation="vertical"
+                fraction={secondary}
+                containerRef={topRef}
+                onFractionChange={onSecondary}
+              />
+              <Cell width={1 - secondary}>
+                <SlotCell index={1} slot={slots[1]} />
+              </Cell>
+            </div>
+          }
+          bottom={
+            <div className="row" style={{ height: "100%" }} ref={bottomRef}>
+              <Cell width={secondary}>
+                <SlotCell index={2} slot={slots[2]} />
+              </Cell>
+              <Splitter
+                orientation="vertical"
+                fraction={secondary}
+                containerRef={bottomRef}
+                onFractionChange={onSecondary}
+              />
+              <Cell width={1 - secondary}>
+                <SlotCell index={3} slot={slots[3]} />
+              </Cell>
+            </div>
+          }
+        />
+      );
+      break;
   }
 
   return <Shell>{content}</Shell>;

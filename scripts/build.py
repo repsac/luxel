@@ -12,7 +12,7 @@ from __future__ import annotations
 import argparse
 import sys
 
-from _common import info, repo_root, run, warn, which
+from _common import info, print_bundle_checksums, repo_root, run, warn, which
 
 
 def install_js_deps(npm: str, root) -> None:
@@ -82,6 +82,7 @@ def main() -> int:
             bundle = root / "target" / "release" / "bundle"
         if bundle.exists():
             info(f"Bundles in: {bundle}")
+            print_bundle_checksums(bundle)
         else:
             warn("tauri build finished but no bundle/ directory was found.")
         return 0

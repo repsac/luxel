@@ -33,6 +33,7 @@ pub enum LayoutShape {
     OneLeftTwoRight,
     TwoLeftOneRight,
     ThreeAcross,
+    TwoByTwo,
 }
 
 impl LayoutShape {
@@ -46,6 +47,7 @@ impl LayoutShape {
             | LayoutShape::OneLeftTwoRight
             | LayoutShape::TwoLeftOneRight
             | LayoutShape::ThreeAcross => 3,
+            LayoutShape::TwoByTwo => 4,
         }
     }
 }
