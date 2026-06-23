@@ -14,7 +14,14 @@ from __future__ import annotations
 import argparse
 import sys
 
-from _common import info, repo_root, run, which
+from _common import (
+    find_bundle_dir,
+    info,
+    print_bundle_checksums,
+    repo_root,
+    run,
+    which,
+)
 
 
 def main() -> int:
@@ -26,8 +33,12 @@ def main() -> int:
     if not npm:
         print("npm not found", file=sys.stderr)
         return 1
-    info("Packaging Luxel via `tauri build` — see scripts/build.py --release for details")
-    return run([npm, "run", "tauri", "--", "build"], cwd=repo_root(), check=False)
+    root = repo_root()
+    info("Packaging Luxel via `tauri build` (see scripts/build.py --release for details)")
+    rc = run([npm, "run", "tauri", "--", "build"], cwd=root, check=False)
+    if rc == 0:
+        print_bundle_checksums(find_bundle_dir(root))
+    return rc
 
 
 if __name__ == "__main__":

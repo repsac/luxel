@@ -49,7 +49,8 @@ export type LayoutPresetId =
   | "oneTopTwoBottom"
   | "twoTopOneBottom"
   | "threeAcross"
-  | "twoAcross";
+  | "twoAcross"
+  | "fourGrid";
 
 export interface LayoutPreset {
   id: LayoutPresetId;
@@ -144,6 +145,22 @@ export const LAYOUT_PRESETS: LayoutPreset[] = [
       shape: "twoAcross",
       slots: [slot("render"), slot("editor")],
       sizes: { primary: 0.55, secondary: 0.5 },
+      maximized: null,
+    }),
+  },
+  {
+    id: "fourGrid",
+    name: "2 × 2 Grid",
+    description: "Render + editor on top, scratchpad + inspector below.",
+    build: () => ({
+      shape: "twoByTwo",
+      slots: [
+        slot("render"),
+        slot("editor"),
+        slot("scratchpad"),
+        slot("inspector"),
+      ],
+      sizes: { primary: 0.5, secondary: 0.5 },
       maximized: null,
     }),
   },

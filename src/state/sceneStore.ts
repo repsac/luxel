@@ -15,7 +15,8 @@ export type LayoutShape =
   | "oneTopTwoBottom"
   | "oneLeftTwoRight"
   | "twoLeftOneRight"
-  | "threeAcross";
+  | "threeAcross"
+  | "twoByTwo";
 
 export interface SlotState {
   view: ViewId;
@@ -49,6 +50,7 @@ export const SHAPE_SLOT_COUNT: Record<LayoutShape, number> = {
   oneLeftTwoRight: 3,
   twoLeftOneRight: 3,
   threeAcross: 3,
+  twoByTwo: 4,
 };
 
 export interface CameraState {

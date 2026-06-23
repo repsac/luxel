@@ -401,31 +401,47 @@ export default function RenderView() {
         )}
         {crosshair && (
           <svg
+            // Key on the pin so a coordinate change remounts the marker, which
+            // is the same path as toggling Crosshair off/on.
+            key={`crosshair-${pinnedPixel?.x},${pinnedPixel?.y}`}
             className="crosshair-overlay"
             viewBox={`0 0 ${previewW} ${previewH}`}
             preserveAspectRatio="none"
           >
-            {/* Full-width/height guide lines plus a box around the pixel, so
-                it's easy to point to during a demo. Lines stop short of the
-                pixel so the target cell stays legible. */}
-            <line
-              x1={0}
-              y1={crosshair.cy}
-              x2={previewW}
-              y2={crosshair.cy}
-              stroke="#ffd166"
-              strokeWidth={1}
-              strokeDasharray="4 3"
-              vectorEffect="non-scaling-stroke"
-            />
-            <line
-              x1={crosshair.cx}
-              y1={0}
-              x2={crosshair.cx}
-              y2={previewH}
-              stroke="#ffd166"
-              strokeWidth={1}
-              strokeDasharray="4 3"
+            {/* Each guide is drawn twice: a dark halo under a bright line, so
+                the crosshair stays visible over light or dark render content.
+                Strokes are non-scaling so they're a constant width on screen
+                regardless of render resolution. */}
+            {[
+              { stroke: "#000", opacity: 0.5, width: 3 },
+              { stroke: "#ffd166", opacity: 1, width: 1 },
+            ].map((s, i) => (
+              <g key={i} stroke={s.stroke} strokeOpacity={s.opacity} strokeWidth={s.width}>
+                <line
+                  x1={0}
+                  y1={crosshair.cy}
+                  x2={previewW}
+                  y2={crosshair.cy}
+                  vectorEffect="non-scaling-stroke"
+                />
+                <line
+                  x1={crosshair.cx}
+                  y1={0}
+                  x2={crosshair.cx}
+                  y2={previewH}
+                  vectorEffect="non-scaling-stroke"
+                />
+              </g>
+            ))}
+            <rect
+              x={crosshair.cx - 0.5}
+              y={crosshair.cy - 0.5}
+              width={1}
+              height={1}
+              fill="none"
+              stroke="#000"
+              strokeOpacity={0.6}
+              strokeWidth={4}
               vectorEffect="non-scaling-stroke"
             />
             <rect
